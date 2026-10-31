@@ -734,3 +734,5 @@ const Schedule = (() => {
     };
 
 })();
+
+window.Schedule = Schedule;

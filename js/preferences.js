@@ -447,3 +447,5 @@ const Prefs = (() => {
     };
 
 })();
+
+window.Prefs = Prefs;

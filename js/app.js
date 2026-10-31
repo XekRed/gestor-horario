@@ -778,5 +778,11 @@ const App = (() => {
 
 })();
 
+window.App = App;
+
 /* ─── Bootstrap ────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => App.init());
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => App.init());
+} else {
+    App.init();
+}

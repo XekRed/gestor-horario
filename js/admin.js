@@ -782,6 +782,10 @@ const Admin = (() => {
 
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
+window.Admin = Admin;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => Admin.init());
+} else {
     Admin.init();
-});
+}

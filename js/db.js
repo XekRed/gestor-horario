@@ -747,3 +747,5 @@ const DB = (() => {
     };
 
 })();
+
+window.DB = DB;

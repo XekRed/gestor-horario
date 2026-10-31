@@ -1017,6 +1017,12 @@ const Activities = (() => {
 
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
+window.Activities = Activities;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        Activities.init();
+    });
+} else {
     Activities.init();
-});
+}

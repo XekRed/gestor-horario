@@ -479,6 +479,12 @@ const Student = (() => {
 
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
+window.Student = Student;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        Student.init();
+    });
+} else {
     Student.init();
-});
+}

@@ -468,3 +468,5 @@ const Notify = (() => {
     };
 
 })();
+
+window.Notify = Notify;
