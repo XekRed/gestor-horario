@@ -1,0 +1,749 @@
+/* =============================================================
+   db.js — Capa de Datos Híbrida con Supabase (PostgreSQL + Auth + Realtime)
+   Fallback automático a localStorage para funcionamiento offline
+   Datos personales del estudiante protegidos en localStorage
+   ============================================================= */
+
+const DB = (() => {
+
+    /* ── KEYS localStorage ───────────────────────────────────── */
+    const LS = {
+        subjects:       'gx_subjects',
+        activities:     'gx_activities',
+        settings:       'gx_settings',
+        grades:         'gx_grades',
+        supabaseConfig: 'gx_supabase_config',
+        pin:            'gx_pin',
+        adminSession:   'gx_admin_auth_user'
+    };
+
+    /* ── ESTADO INTERNO ──────────────────────────────────────── */
+    let _mode          = 'local';    // 'local' | 'supabase'
+    let _supabase      = null;       // cliente Supabase oficial
+    let _adminUser     = null;       // usuario administrador autenticado
+    let _adminUnlocked = false;      // estado de sesión del administrador
+    let _realtimeChan  = null;       // canal de suscripción realtime
+    let _cbs           = {};         // col → [callbacks de reactividad]
+    let _cache         = {};         // col → datos en memoria sincronizados
+
+    /* ══════════════════════════════════════════════════════════
+       DATOS SEMILLA POR DEFECTO (Horario VIII Semestre ISII)
+    ═══════════════════════════════════════════════════════════ */
+    const SEED_SUBJECTS = [
+        {
+            id: 'civico',
+            name: 'CÍVICO',
+            shortName: 'CIV',
+            code: 'CIV-08S',
+            room: '',
+            teacher: '',
+            color: '#00f0ff',
+            slots: [{ day: 0, startBlock: 1, span: 1 }]
+        },
+        {
+            id: 'cultura',
+            name: 'CULTURA Y COMUNICACIÓN',
+            shortName: 'C&C',
+            code: 'C&C-08S',
+            room: 'YSSF-010',
+            teacher: '',
+            color: '#9b59b6',
+            slots: [{ day: 0, startBlock: 2, span: 2 }]
+        },
+        {
+            id: 'auditoria',
+            name: 'AUDITORÍA DE SISTEMAS',
+            shortName: 'AUD',
+            code: 'AUD-08S',
+            room: 'YSSF-010',
+            teacher: 'Ing. Carlos Pérez',
+            color: '#ff9f43',
+            slots: [
+                { day: 0, startBlock: 4, span: 3 },
+                { day: 2, startBlock: 1, span: 3 }
+            ]
+        },
+        {
+            id: 'teleprocesos',
+            name: 'TELEPROCESOS',
+            shortName: 'TEL',
+            code: 'TEL-08S',
+            room: 'YSSF-027',
+            teacher: 'Ing. María Gómez',
+            color: '#00e5a0',
+            slots: [{ day: 0, startBlock: 8, span: 6 }]
+        },
+        {
+            id: 'planificacion',
+            name: 'PLANIFICACIÓN Y EVALUACIÓN DE PROYECTOS (ENT)',
+            shortName: 'PEP',
+            code: 'PEP-08S',
+            room: 'YSSF-010',
+            teacher: 'Prof. Luis Rondón',
+            color: '#5865F2',
+            slots: [{ day: 2, startBlock: 4, span: 3 }]
+        },
+        {
+            id: 'teoria',
+            name: 'TEORÍA DE DECISIONES',
+            shortName: 'TD',
+            code: 'TD-08S',
+            room: 'YSSF-010',
+            teacher: 'Prof. Ana Díaz',
+            color: '#ff2e5f',
+            slots: [{ day: 3, startBlock: 2, span: 5 }]
+        },
+        {
+            id: 'defensa',
+            name: 'DEFENSA INTEGRAL DE LA NACIÓN VIII',
+            shortName: 'DIN',
+            code: 'DIN-08S',
+            room: '',
+            teacher: 'Cap. Rodríguez',
+            color: '#00bfa5',
+            slots: [{ day: 3, startBlock: 8, span: 4 }]
+        },
+        {
+            id: 'ia',
+            name: 'INTELIGENCIA ARTIFICIAL (ET)',
+            shortName: 'IA',
+            code: 'IA-08S',
+            room: 'YSSF-010',
+            teacher: 'Ing. José Martínez',
+            color: '#f9ca24',
+            slots: [{ day: 4, startBlock: 3, span: 4 }]
+        },
+        {
+            id: 'marco',
+            name: 'MARCO LEGAL PARA EL EJER. DE LA INGENIERÍA',
+            shortName: 'MLE',
+            code: 'MLE-08S',
+            room: 'YSSF-010',
+            teacher: 'Abg. Rosa Flores',
+            color: '#fd79a8',
+            slots: [{ day: 4, startBlock: 8, span: 4 }]
+        },
+    ];
+
+    const DEFAULT_SETTINGS = {
+        carrera:  'INGENIERÍA DE SISTEMAS',
+        semestre: 'VIII',
+        seccion:  '08S-2623-D1',
+        periodo:  '2026-I (Diurno)'
+    };
+
+    /* ══════════════════════════════════════════════════════════
+       MAPEO DE MODELOS (PostgreSQL Supabase ⇄ App Frontend)
+    ═══════════════════════════════════════════════════════════ */
+    function _toClientSubject(row) {
+        return {
+            id:        row.id,
+            code:      row.subject_code,
+            name:      row.name,
+            shortName: row.short_name || row.name.slice(0, 4),
+            room:      row.classroom || '',
+            teacher:   row.professor || '',
+            color:     row.color || '#00f0ff',
+            slots:     Array.isArray(row.schedule_blocks) ? row.schedule_blocks : []
+        };
+    }
+
+    function _toDbSubject(item) {
+        const settings = getSettings();
+        return {
+            id:              item.id,
+            subject_code:    item.code || `${(item.shortName || item.name.slice(0, 4)).toUpperCase().replace(/\s+/g, '')}-08S`,
+            section_code:    settings.seccion || '08S-2623-D1',
+            name:            item.name,
+            short_name:      item.shortName || item.name.slice(0, 4),
+            classroom:       item.room || '',
+            professor:       item.teacher || '',
+            color:           item.color || '#00f0ff',
+            schedule_blocks: Array.isArray(item.slots) ? item.slots : []
+        };
+    }
+
+    function _toClientActivity(row) {
+        const g = (typeof row.guidelines === 'object' && row.guidelines !== null) ? row.guidelines : {};
+        let dateStr = '';
+        let timeStr = '';
+        if (row.due_date) {
+            const dt = new Date(row.due_date);
+            dateStr = dt.toISOString().split('T')[0];
+            timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        }
+        const priorityMap = { alta: 'high', baja: 'low', media: 'medium' };
+        const clientPriority = priorityMap[row.priority] || row.priority || 'medium';
+
+        return {
+            id:         row.id,
+            subjectId:  row.subject_id,
+            modality:   row.is_special_event ? 'special' : 'subject',
+            title:      row.title,
+            corte:      row.cut ? String(row.cut) : null,
+            weight:     row.percentage !== null && row.percentage !== undefined ? Number(row.percentage) : 0,
+            priority:   clientPriority,
+            date:       dateStr,
+            time:       timeStr,
+            guidelines: g,
+            desc:       g.instructions || ''
+        };
+    }
+
+    function _toDbActivity(act) {
+        const settings = getSettings();
+        const datePart = act.date || new Date().toISOString().split('T')[0];
+        const timePart = act.time || '23:59';
+        const dueIso = new Date(`${datePart}T${timePart}:00`).toISOString();
+
+        const priorityMap = { high: 'alta', low: 'baja', medium: 'media' };
+        const dbPriority = priorityMap[act.priority] || act.priority || 'media';
+
+        return {
+            id:               act.id,
+            subject_id:       act.subjectId || null,
+            section_code:     settings.seccion || '08S-2623-D1',
+            is_special_event: (act.modality === 'special' || !act.subjectId),
+            title:            act.title,
+            cut:              act.corte ? parseInt(act.corte, 10) : null,
+            percentage:       act.weight !== null && act.weight !== undefined ? parseFloat(act.weight) : 0,
+            priority:         dbPriority,
+            due_date:         dueIso,
+            guidelines:       act.guidelines || { instructions: act.desc || '' }
+        };
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       CONFIGURACIÓN DE SUPABASE
+    ═══════════════════════════════════════════════════════════ */
+    function _cleanUrl(url) {
+        if (!url) return '';
+        return url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+    }
+
+    function getSupabaseConfig() {
+        const raw = localStorage.getItem(LS.supabaseConfig);
+        if (raw) {
+            try {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.url && parsed.anonKey) {
+                    return {
+                        url: _cleanUrl(parsed.url),
+                        anonKey: parsed.anonKey.trim()
+                    };
+                }
+            } catch (e) {}
+        }
+        // Fallback a configuración global en js/config.js (para todos los estudiantes)
+        if (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.supabaseUrl && window.APP_CONFIG.supabaseAnonKey) {
+            return {
+                url: _cleanUrl(window.APP_CONFIG.supabaseUrl),
+                anonKey: window.APP_CONFIG.supabaseAnonKey.trim()
+            };
+        }
+        return null;
+    }
+
+    function saveSupabaseConfig(cfg) {
+        if (!cfg) {
+            localStorage.removeItem(LS.supabaseConfig);
+        } else {
+            localStorage.setItem(LS.supabaseConfig, JSON.stringify(cfg));
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       INICIALIZACIÓN DEL CLIENTE
+    ═══════════════════════════════════════════════════════════ */
+    async function init() {
+        // 1. Cargar semillas locales inmediatas para evitar parpadeos
+        if (!localStorage.getItem(LS.subjects)) {
+            localStorage.setItem(LS.subjects, JSON.stringify(SEED_SUBJECTS));
+        }
+        if (!localStorage.getItem(LS.settings)) {
+            localStorage.setItem(LS.settings, JSON.stringify(DEFAULT_SETTINGS));
+        }
+
+        _cache['subjects']   = _readLS('subjects');
+        _cache['activities'] = _readLS('activities');
+        _cache['settings']   = getSettings();
+
+        // 2. Intentar inicializar cliente Supabase
+        const cfg = getSupabaseConfig();
+        const hasSupabaseLib = (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function');
+
+        if (cfg && cfg.url && cfg.anonKey && hasSupabaseLib) {
+            try {
+                _supabase = window.supabase.createClient(cfg.url, cfg.anonKey, {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: true,
+                        storage: window.localStorage
+                    }
+                });
+
+                _mode = 'supabase';
+                console.log('[DB] Cliente Supabase inicializado con éxito');
+
+                // Verificar sesión permanente activa
+                await _checkSession();
+
+                // Escuchar cambios de estado en Auth
+                _supabase.auth.onAuthStateChange((event, session) => {
+                    if (session && session.user) {
+                        _adminUser = session.user;
+                        _adminUnlocked = true;
+                        localStorage.setItem(LS.adminSession, JSON.stringify(session.user));
+                    } else {
+                        _adminUser = null;
+                        _adminUnlocked = false;
+                        localStorage.removeItem(LS.adminSession);
+                    }
+                    _notifyAdminStateChange();
+                });
+
+                // Descarga inicial de datos desde Supabase
+                await _syncFromSupabase('sections');
+                await _syncFromSupabase('subjects');
+                await _syncFromSupabase('activities');
+
+                // Conectar canal Realtime
+                _setupRealtime();
+
+            } catch (err) {
+                console.warn('[DB] No se pudo conectar a Supabase, usando fallback local:', err);
+                _mode = 'local';
+            }
+        } else {
+            _mode = 'local';
+            // Restaurar sesión admin local si existía
+            if (localStorage.getItem(LS.adminSession) || sessionStorage.getItem('gx_admin_unlocked') === 'true') {
+                _adminUnlocked = true;
+            }
+        }
+
+        return _mode;
+    }
+
+    async function _checkSession() {
+        if (!_supabase) return;
+        try {
+            const { data, error } = await _supabase.auth.getSession();
+            if (data && data.session && data.session.user) {
+                _adminUser = data.session.user;
+                _adminUnlocked = true;
+                localStorage.setItem(LS.adminSession, JSON.stringify(data.session.user));
+            } else {
+                _adminUser = null;
+                _adminUnlocked = false;
+                localStorage.removeItem(LS.adminSession);
+            }
+        } catch (e) {
+            console.error('[DB] Error comprobando sesión:', e);
+        }
+    }
+
+    function _notifyAdminStateChange() {
+        if (typeof Admin !== 'undefined' && Admin.updateModeBadge) {
+            Admin.updateModeBadge();
+        }
+        // Disparar re-renderizado para mostrar/ocultar botones de edición
+        if (typeof Activities !== 'undefined' && Activities.renderTimeline) {
+            Activities.renderTimeline();
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       DESCARGA Y SINCRONIZACIÓN DESDE SUPABASE
+    ═══════════════════════════════════════════════════════════ */
+    async function _syncFromSupabase(tableName) {
+        if (!_supabase) return;
+        try {
+            if (tableName === 'sections') {
+                const { data, error } = await _supabase
+                    .from('sections')
+                    .select('*')
+                    .limit(1)
+                    .single();
+
+                if (data && !error) {
+                    const settingsObj = {
+                        carrera:  data.career || 'INGENIERÍA DE SISTEMAS',
+                        semestre: data.semester || 'VIII',
+                        seccion:  data.section_code || '08S-2623-D1',
+                        periodo:  data.period || '2026-I (Diurno)'
+                    };
+                    _cache['settings'] = settingsObj;
+                    localStorage.setItem(LS.settings, JSON.stringify(settingsObj));
+                    _notify('settings', settingsObj);
+                }
+            } else if (tableName === 'subjects') {
+                const { data, error } = await _supabase
+                    .from('subjects')
+                    .select('*')
+                    .order('created_at', { ascending: true });
+
+                if (data && !error && data.length > 0) {
+                    const mapped = data.map(_toClientSubject);
+                    _cache['subjects'] = mapped;
+                    _localBackup('subjects', mapped);
+                    _notify('subjects', mapped);
+                }
+            } else if (tableName === 'activities') {
+                const { data, error } = await _supabase
+                    .from('activities')
+                    .select('*')
+                    .order('due_date', { ascending: true });
+
+                if (data && !error) {
+                    const mapped = data.map(_toClientActivity);
+                    _cache['activities'] = mapped;
+                    _localBackup('activities', mapped);
+                    _notify('activities', mapped);
+                }
+            }
+        } catch (err) {
+            console.error(`[DB] Error sincronizando ${tableName} desde Supabase:`, err);
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SUPABASE REALTIME (Websocket Postgres Changes)
+    ═══════════════════════════════════════════════════════════ */
+    function _setupRealtime() {
+        if (!_supabase) return;
+        if (_realtimeChan) {
+            _supabase.removeChannel(_realtimeChan);
+        }
+
+        _realtimeChan = _supabase.channel('public-academic-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'subjects' }, () => {
+                _syncFromSupabase('subjects');
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => {
+                _syncFromSupabase('activities');
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, () => {
+                _syncFromSupabase('sections');
+            })
+            .subscribe((status) => {
+                console.log('[DB Realtime]', status);
+            });
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SUSCRIPCIÓN REACTIVA DE VISTAS
+    ═══════════════════════════════════════════════════════════ */
+    function subscribe(collection, callback) {
+        if (!_cbs[collection]) _cbs[collection] = [];
+        _cbs[collection].push(callback);
+
+        // Disparo inicial inmediato con datos de caché
+        const currentData = get(collection);
+        if (currentData !== undefined) {
+            try { callback(currentData); } catch (e) { console.error(e); }
+        }
+    }
+
+    function _notify(collection, data) {
+        (_cbs[collection] || []).forEach(cb => {
+            try { cb(data); } catch (e) { console.error(e); }
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       LECTURA Y ESCRITURA DE DATOS
+    ═══════════════════════════════════════════════════════════ */
+    function get(collection) {
+        if (collection === 'settings') return getSettings();
+        if (_cache[collection] !== undefined) return _cache[collection];
+        const data = _readLS(collection);
+        _cache[collection] = data;
+        return data;
+    }
+
+    function _readLS(collection) {
+        const key = LS[collection];
+        if (!key) return [];
+        const s = localStorage.getItem(key);
+        if (s) {
+            try { return JSON.parse(s); } catch { return []; }
+        }
+        if (collection === 'subjects') return [...SEED_SUBJECTS];
+        return [];
+    }
+
+    function _localBackup(collection, items) {
+        const key = LS[collection];
+        if (key) localStorage.setItem(key, JSON.stringify(items));
+    }
+
+    async function save(collection, items) {
+        _cache[collection] = items;
+        _localBackup(collection, items);
+        _notify(collection, items);
+
+        if (_mode === 'supabase' && _supabase) {
+            try {
+                if (collection === 'subjects') {
+                    const rows = items.map(_toDbSubject);
+                    await _supabase.from('subjects').upsert(rows);
+                } else if (collection === 'activities') {
+                    const rows = items.map(_toDbActivity);
+                    await _supabase.from('activities').upsert(rows);
+                }
+            } catch (e) {
+                console.error(`[DB] Error en save(${collection}) Supabase:`, e);
+            }
+        }
+    }
+
+    async function saveOne(collection, item) {
+        const items = [...get(collection)];
+        const idx   = items.findIndex(i => i.id === item.id);
+        if (idx >= 0) items[idx] = item;
+        else          items.push(item);
+
+        _cache[collection] = items;
+        _localBackup(collection, items);
+        _notify(collection, items);
+
+        if (_mode === 'supabase' && _supabase) {
+            try {
+                if (collection === 'subjects') {
+                    const dbRow = _toDbSubject(item);
+                    const { error } = await _supabase.from('subjects').upsert(dbRow);
+                    if (error) throw error;
+                } else if (collection === 'activities') {
+                    const dbRow = _toDbActivity(item);
+                    const { error } = await _supabase.from('activities').upsert(dbRow);
+                    if (error) throw error;
+                }
+            } catch (e) {
+                console.error(`[DB] Error en saveOne(${collection}) Supabase:`, e);
+                throw e;
+            }
+        }
+    }
+
+    async function removeOne(collection, id) {
+        const items = get(collection).filter(i => i.id !== id);
+        _cache[collection] = items;
+        _localBackup(collection, items);
+        _notify(collection, items);
+
+        if (_mode === 'supabase' && _supabase) {
+            try {
+                const table = (collection === 'subjects') ? 'subjects' : 'activities';
+                const { error } = await _supabase.from(table).delete().eq('id', id);
+                if (error) throw error;
+            } catch (e) {
+                console.error(`[DB] Error en removeOne(${collection}) Supabase:`, e);
+                throw e;
+            }
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SETTINGS (Sección Académica)
+    ═══════════════════════════════════════════════════════════ */
+    function getSettings() {
+        if (_cache['settings']) return _cache['settings'];
+        const s = localStorage.getItem(LS.settings);
+        const obj = s ? JSON.parse(s) : { ...DEFAULT_SETTINGS };
+        _cache['settings'] = obj;
+        return obj;
+    }
+
+    async function saveSettings(obj) {
+        _cache['settings'] = obj;
+        localStorage.setItem(LS.settings, JSON.stringify(obj));
+        _notify('settings', obj);
+
+        if (_mode === 'supabase' && _supabase) {
+            try {
+                const row = {
+                    id:           obj.seccion || '08S-2623-D1',
+                    career:       obj.carrera,
+                    semester:     obj.semestre,
+                    section_code: obj.seccion,
+                    period:       obj.periodo,
+                    updated_at:   new Date().toISOString()
+                };
+                await _supabase.from('sections').upsert(row);
+            } catch (e) {
+                console.error('[DB] Error guardando settings en Supabase:', e);
+            }
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       AUTENTICACIÓN ADMINISTRADOR (Supabase Auth + Sesión Permanente)
+    ═══════════════════════════════════════════════════════════ */
+    async function loginWithPassword(email, password) {
+        if (_supabase) {
+            try {
+                const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+                if (error) {
+                    return { success: false, error: error.message };
+                }
+                _adminUser = data.user;
+                _adminUnlocked = true;
+                localStorage.setItem(LS.adminSession, JSON.stringify(data.user));
+                _notifyAdminStateChange();
+                return { success: true, user: data.user };
+            } catch (e) {
+                return { success: false, error: e.message };
+            }
+        } else {
+            // Modo local: comprobación con PIN
+            return { success: false, error: 'Supabase no está configurado aún. Usa el PIN de emergencia (1234).' };
+        }
+    }
+
+    async function loginWithMagicLink(email) {
+        if (!_supabase) {
+            return { success: false, error: 'Supabase no está configurado.' };
+        }
+        try {
+            const { error } = await _supabase.auth.signInWithOtp({
+                email,
+                options: { emailRedirectTo: window.location.href }
+            });
+            if (error) return { success: false, error: error.message };
+            return { success: true };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    }
+
+    async function logoutAdmin() {
+        if (_supabase) {
+            try {
+                await _supabase.auth.signOut();
+            } catch (e) {}
+        }
+        _adminUser = null;
+        _adminUnlocked = false;
+        localStorage.removeItem(LS.adminSession);
+        sessionStorage.removeItem('gx_admin_unlocked');
+        _notifyAdminStateChange();
+        return { success: true };
+    }
+
+    function unlockAdmin(user = null) {
+        _adminUnlocked = true;
+        if (user) {
+            _adminUser = user;
+            localStorage.setItem(LS.adminSession, JSON.stringify(user));
+        } else {
+            sessionStorage.setItem('gx_admin_unlocked', 'true');
+        }
+        _notifyAdminStateChange();
+    }
+
+    function lockAdmin() {
+        logoutAdmin();
+    }
+
+    function isAdminUnlocked() {
+        if (_adminUnlocked) return true;
+        if (localStorage.getItem(LS.adminSession)) {
+            try {
+                _adminUser = JSON.parse(localStorage.getItem(LS.adminSession));
+                _adminUnlocked = true;
+                return true;
+            } catch (e) {}
+        }
+        if (sessionStorage.getItem('gx_admin_unlocked') === 'true') {
+            _adminUnlocked = true;
+            return true;
+        }
+        return false;
+    }
+
+    function getAdminUser() {
+        return _adminUser;
+    }
+
+    /* ── PIN DE EMERGENCIA (MODO LOCAL) ── */
+    function getPin()      { return localStorage.getItem(LS.pin) || '1234'; }
+    function savePin(pin)  { localStorage.setItem(LS.pin, String(pin)); }
+    function checkPin(pin) { return String(pin) === getPin(); }
+
+    /* ══════════════════════════════════════════════════════════
+       UTILIDADES DE RESPALDO Y ESTADO
+    ═══════════════════════════════════════════════════════════ */
+    function getMode()     { return _mode; }
+    function isSupabase()  { return _mode === 'supabase'; }
+    function generateId()  {
+        return 'act_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function clearAllData() {
+        Object.values(LS).forEach(k => localStorage.removeItem(k));
+        Object.keys(_cache).forEach(k => delete _cache[k]);
+        localStorage.setItem(LS.subjects, JSON.stringify(SEED_SUBJECTS));
+        localStorage.setItem(LS.settings, JSON.stringify(DEFAULT_SETTINGS));
+        _cache['subjects']   = [...SEED_SUBJECTS];
+        _cache['activities'] = [];
+        _cache['grades']     = [];
+    }
+
+    function exportData() {
+        return JSON.stringify({
+            subjects:   get('subjects'),
+            activities: get('activities'),
+            settings:   getSettings(),
+            exportedAt: new Date().toISOString(),
+        }, null, 2);
+    }
+
+    function importData(jsonStr) {
+        try {
+            const data = JSON.parse(jsonStr);
+            if (data.subjects)   save('subjects',   data.subjects);
+            if (data.activities) save('activities', data.activities);
+            if (data.settings)   saveSettings(data.settings);
+            return true;
+        } catch (e) {
+            console.error('[DB] importData error:', e);
+            return false;
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       API PÚBLICA
+    ═══════════════════════════════════════════════════════════ */
+    return {
+        init,
+        subscribe,
+        get,
+        save,
+        saveOne,
+        removeOne,
+        getSettings,
+        saveSettings,
+        loginWithPassword,
+        loginWithMagicLink,
+        logoutAdmin,
+        unlockAdmin,
+        lockAdmin,
+        isAdminUnlocked,
+        getAdminUser,
+        getPin,
+        savePin,
+        checkPin,
+        getSupabaseConfig,
+        saveSupabaseConfig,
+        getMode,
+        isSupabase,
+        generateId,
+        clearAllData,
+        exportData,
+        importData,
+        get SEED_SUBJECTS() { return SEED_SUBJECTS; }
+    };
+
+})();

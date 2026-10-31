@@ -1,0 +1,31 @@
+name: Resumen Matutino Académico (Morning Digest)
+
+on:
+  schedule:
+    # Todos los días a las 06:30 AM (Hora de Venezuela, UTC-4 = 10:30 UTC)
+    - cron: '30 10 * * *'
+  workflow_dispatch: # Permite disparo manual desde la pestaña Actions de GitHub
+
+jobs:
+  morning-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Ejecutar script notificador matutino
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://qwshviiriavlosnpyaku.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3c2h2aWlyaWF2bG9zbnB5YWt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzOTY2OTQsImV4cCI6MjEwODk3MjY5NH0.4r-v04SgjheLtqn7rQIL4FEqqmAK2lpDAZk4p3kCDY4' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_TO_EMAIL: ${{ secrets.RESEND_TO_EMAIL }}
+        run: node scripts/morning-digest.mjs

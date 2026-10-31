@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor Académico XK | ISII — 08S-2623-D1</title>
+    <meta name="description"
+        content="Gestor académico universitario: horario, actividades, calendario y notas. Ingeniería de Sistemas — UBV. By XekRed.">
+    <meta name="author" content="XekRed">
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Lucide Icons (SVG icon system) -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <!-- Supabase JS Client (v2) -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+    <!-- Ambient background -->
+    <div class="bg-particles" id="particles"></div>
+    <div class="scanlines"></div>
+
+    <div class="app-container">
+
+        <!-- ══════════════════ HEADER ══════════════════ -->
+        <header class="app-header">
+            <div class="header-glow"></div>
+            <div class="header-content">
+
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="28" height="28"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                    </div>
+                    <div class="title-block">
+                        <h1 class="glitch-text" data-text="GESTOR ACADÉMICO">GESTOR ACADÉMICO</h1>
+                        <span class="subtitle">SISTEMA DE GESTIÓN UNIVERSITARIA · XK</span>
+                    </div>
+                </div>
+
+                <div class="header-meta">
+                    <div class="meta-badge">
+                        <span class="meta-label">CARRERA</span>
+                        <span class="meta-value" id="metaCarrera">INGENIERÍA DE SISTEMAS</span>
+                    </div>
+                    <div class="meta-sep">·</div>
+                    <div class="meta-badge">
+                        <span class="meta-label">SEMESTRE</span>
+                        <span class="meta-value" id="metaSemestre">VIII</span>
+                    </div>
+                    <div class="meta-sep">·</div>
+                    <div class="meta-badge">
+                        <span class="meta-label">SECCIÓN</span>
+                        <span class="meta-value mono" id="metaSeccion">08S-2623-D1</span>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <div class="live-clock" id="liveClock">
+                        <span class="clock-time" id="clockTime">--:--:--</span>
+                        <span class="clock-date" id="clockDate">--</span>
+                    </div>
+                    <div class="day-badge" id="dayBadge">HOY: --</div>
+                    <div class="header-actions-row"
+                        style="display:flex;gap:6px;margin-top:4px;justify-content:flex-end;">
+                        <button class="btn-ghost btn-sm" onclick="Prefs.openPanel()"
+                            title="Preferencias Visuales y Académicas" style="padding:4px 8px;font-size:0.7rem;display:flex;align-items:center;gap:4px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/><circle cx="12" cy="12" r="1"/></svg>
+                            Preferencias</button>
+                        <button class="btn-ghost btn-sm" onclick="Notify.shareTodayScheduleWhatsApp()"
+                            title="Compartir Horario de Hoy por WhatsApp" style="padding:4px 8px;font-size:0.7rem;display:flex;align-items:center;gap:4px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            WhatsApp</button>
+                        <button class="btn-ghost btn-sm" onclick="Notify.requestPermission()"
+                            title="Activar Notificaciones Web" style="padding:4px 8px;font-size:0.7rem;display:flex;align-items:center;gap:4px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                            Avisos</button>
+                    </div>
+                </div>
+
+            </div>
+        </header>
+
+        <!-- ══════════════════ NAV TABS ══════════════════ -->
+        <nav class="tab-nav" id="tabNav">
+            <button class="tab-btn active" data-tab="dashboard" id="tab-dashboard">
+                <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>
+                <span class="tab-label">Dashboard</span>
+            </button>
+            <button class="tab-btn" data-tab="schedule" id="tab-schedule">
+                <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span class="tab-label">Horario</span>
+            </button>
+            <button class="tab-btn" data-tab="calendar" id="tab-calendar">
+                <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                <span class="tab-label">Calendario & Timeline</span>
+            </button>
+            <button class="tab-btn" data-tab="grades" id="tab-grades">
+                <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="tab-label">Mis Notas</span>
+            </button>
+        </nav>
+
+        <!-- ══════════════════ MAIN CONTENT ══════════════════ -->
+        <main class="main-content">
+
+            <!-- ─── TAB: DASHBOARD ─── -->
+            <section class="tab-panel active" id="panel-dashboard">
+
+                <!-- Alert strip -->
+                <div class="alert-strip" id="alertStrip" style="display:none"></div>
+
+                <!-- Quick Stats -->
+                <div class="dash-stats-row" id="dashStatsRow">
+                    <div class="stat-card">
+                        <span class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+                        <div>
+                            <span class="stat-num" id="statMaterias">9</span>
+                            <span class="stat-lbl">Materias</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                        <div>
+                            <span class="stat-num" id="statProxima">--</span>
+                            <span class="stat-lbl">Próxima clase</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span>
+                        <div>
+                            <span class="stat-num" id="statPendientes">0</span>
+                            <span class="stat-lbl">Pendientes</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
+                        <div>
+                            <span class="stat-num" id="statPromedio">--</span>
+                            <span class="stat-lbl">Promedio</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's classes strip -->
+                <div class="card section-card">
+                    <div class="card-header">
+                        <span class="card-label">CLASES DE HOY</span>
+                        <span class="card-badge" id="todayLabel">--</span>
+                    </div>
+                    <div class="today-strip" id="todayStrip">
+                        <p class="empty-msg">No hay clases programadas para hoy</p>
+                    </div>
+                </div>
+
+                <!-- Activities grid -->
+                <div class="dash-two-col">
+                    <div class="card section-card">
+                        <div class="card-header">
+                            <span class="card-label">PRÓXIMAS ENTREGAS</span>
+                        </div>
+                        <div id="upcomingActivities">
+                            <p class="empty-msg">Sin entregas próximas</p>
+                        </div>
+                    </div>
+                    <div class="card section-card">
+                        <div class="card-header">
+                            <span class="card-label">ACCIONES RÁPIDAS</span>
+                        </div>
+                        <div class="quick-actions">
+                            <button class="qa-btn" onclick="App.switchTab('schedule')">Ver Horario</button>
+                            <button class="qa-btn" onclick="App.openNewActivity()">Nueva Actividad</button>
+                            <button class="qa-btn" onclick="App.switchTab('calendar')">Timeline</button>
+                            <button class="qa-btn" onclick="App.switchTab('grades')">Mis Notas</button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- ─── TAB: HORARIO ─── -->
+            <section class="tab-panel" id="panel-schedule">
+                <div class="schedule-header-row">
+                    <div>
+                        <h2 class="section-title">Horario de Clases</h2>
+                        <p class="section-sub">Lunes a Sábado · Bloques de 45 minutos · Semestre VIII</p>
+                    </div>
+                    <div class="schedule-legend" id="scheduleLegend"></div>
+                </div>
+                <div class="schedule-scroll-wrap">
+                    <div class="schedule-table-wrap">
+                        <table class="schedule-table" id="scheduleTable">
+                            <!-- Rendered by schedule.js -->
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── TAB: CALENDARIO & TIMELINE ─── -->
+            <section class="tab-panel" id="panel-calendar">
+                <div class="cal-tl-toggle">
+                    <button class="toggle-btn active" id="btnCalView" onclick="App.switchCalView('calendar')">
+                        Calendario
+                    </button>
+                    <button class="toggle-btn" id="btnTlView" onclick="App.switchCalView('timeline')">
+                        Línea de Tiempo
+                    </button>
+                </div>
+
+                <!-- Calendar view -->
+                <div id="calendarView">
+                    <div class="cal-nav">
+                        <button class="btn-icon" id="calPrev">◀</button>
+                        <span class="cal-month-label" id="calMonthLabel">--</span>
+                        <button class="btn-icon" id="calNext">▶</button>
+                    </div>
+                    <div class="calendar-grid-wrap">
+                        <div class="cal-days-header">
+                            <span>Lun</span><span>Mar</span><span>Mié</span>
+                            <span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+                        </div>
+                        <div class="calendar-grid" id="calendarGrid"></div>
+                    </div>
+                    <div class="cal-events-panel" id="calEventsPanel">
+                        <p class="empty-msg">Selecciona un día para ver eventos</p>
+                    </div>
+                </div>
+
+                <!-- Timeline view -->
+                <div id="timelineView" style="display:none">
+                    <div class="tl-filters">
+                        <select class="filter-sel" id="tlFilterMateria">
+                            <option value="all">Todas las materias</option>
+                        </select>
+                        <select class="filter-sel" id="tlFilterCorte">
+                            <option value="all">Todos los cortes</option>
+                            <option value="1">1er Corte</option>
+                            <option value="2">2do Corte</option>
+                            <option value="3">3er Corte</option>
+                            <option value="4">4to Corte</option>
+                        </select>
+                        <button class="btn-primary btn-sm" id="btnAddTlActivity">Agregar</button>
+                    </div>
+                    <div class="timeline-wrap" id="timelineWrap">
+                        <p class="empty-msg" style="text-align:center;padding:40px">Sin actividades registradas</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ─── TAB: MIS NOTAS (CONTROL PERSONAL POR DISPOSITIVO) ─── -->
+            <section class="tab-panel" id="panel-grades">
+                <div class="grades-header-row">
+                    <div>
+                        <h2 class="section-title">Mis Notas & Rendimiento</h2>
+                        <p class="section-sub">Control individual por alumno (Escala 0–20 pts) · Datos guardados 100% en este dispositivo</p>
+                    </div>
+                    <div class="grades-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <button class="btn-ghost btn-sm" onclick="Student.exportStudentData()" title="Descargar copia JSON de mis notas y progreso">Exportar Notas</button>
+                        <label class="btn-ghost btn-sm" style="cursor:pointer;margin:0;" title="Cargar archivo JSON previo de mis notas">
+                            Importar Notas
+                            <input type="file" id="inputStudentGradesFile" accept=".json" style="display:none" onchange="Student.importStudentDataFromFile(this)">
+                        </label>
+                    </div>
+                </div>
+                <div class="student-progress-card" id="studentProgressCard"></div>
+                <div class="grades-grid" id="gradesGrid">
+                    <p class="empty-msg" style="text-align:center;padding:40px">Cargando materias y calificaciones...</p>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="app-footer">
+            <p>Gestor Académico XK · Datos almacenados localmente · <span id="footerSemester">VIII Semestre · ISII ·
+                    08S-2623-D1</span></p>
+            <p class="footer-brand">XekRed Dev</p>
+        </footer>
+
+    </div><!-- /app-container -->
+
+    <!-- ══════════════════════════════════════════
+         MODAL: SUBJECT DETAIL
+    ════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="modalSubject" onclick="Schedule.closeModal(event)">
+        <div class="modal-box" id="modalSubjectBox">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-color-dot" id="modalColorDot"></span>
+                    <span class="modal-title" id="modalSubjectName">--</span>
+                </div>
+                <button class="modal-close-btn" onclick="Schedule.closeModal(null, true)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-info-grid">
+                    <div class="modal-info-item">
+                        <span class="modal-info-label">Aula</span>
+                        <span class="modal-info-val mono" id="modalRoom">--</span>
+                    </div>
+                    <div class="modal-info-item">
+                        <span class="modal-info-label">Código</span>
+                        <span class="modal-info-val mono" id="modalCode">--</span>
+                    </div>
+                    <div class="modal-info-item">
+                        <span class="modal-info-label">Profesor</span>
+                        <span class="modal-info-val" id="modalTeacher">--</span>
+                    </div>
+                    <div class="modal-info-item">
+                        <span class="modal-info-label">Horas/semana</span>
+                        <span class="modal-info-val mono" id="modalHours">--</span>
+                    </div>
+                </div>
+
+                <div class="modal-section-title">Horario semanal</div>
+                <div class="modal-schedule-list" id="modalScheduleList"></div>
+
+                <div class="modal-section-title">Actividades asociadas</div>
+                <div id="modalActivities">
+                    <p class="empty-msg">Sin actividades registradas</p>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-primary" onclick="Activities.openModal(null, Schedule.currentSubjectId)">
+                        Agregar Actividad
+                    </button>
+                    <button class="btn-ghost" onclick="App.switchTab('grades'); Schedule.closeModal(null,true)">
+                        ⭐ Ver Notas
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         MODAL: CREAR / EDITAR ACTIVIDAD (ADMIN)
+    ════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="modalActivity" onclick="Activities.closeModal(event)">
+        <div class="modal-box modal-box-activity" id="modalActivityBox">
+            <div class="modal-header">
+                <span class="modal-title" id="actModalHeaderTitle">Nueva Actividad / Evento</span>
+                <button class="modal-close-btn" onclick="Activities.closeModal(null, true)">&times;</button>
+            </div>
+
+            <!-- Selector de Modalidad (Evaluación vs Evento Especial) -->
+            <div class="activity-modal-modes">
+                <button type="button" class="mode-tab-btn active" id="btnModeSubject" onclick="Activities.setModality('subject')">
+                    Evaluación de Materia
+                </button>
+                <button type="button" class="mode-tab-btn" id="btnModeSpecial" onclick="Activities.setModality('special')">
+                    Evento Especial / Fuera de Materia
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" id="actEditId" value="">
+
+                <!-- Preajustes Rápidos de Título -->
+                <div class="quick-title-chips" id="quickTitleChips">
+                    <span style="font-size:0.65rem;color:var(--text-3);font-weight:700;">PREAJUSTES:</span>
+                    <button type="button" class="chip-preset" onclick="Activities.setPresetTitle('Parcial I')">Parcial I</button>
+                    <button type="button" class="chip-preset" onclick="Activities.setPresetTitle('Taller Práctico')">Taller Práctico</button>
+                    <button type="button" class="chip-preset" onclick="Activities.setPresetTitle('Exposición')">Exposición</button>
+                    <button type="button" class="chip-preset" onclick="Activities.setPresetTitle('Proyecto Final')">Proyecto Final</button>
+                    <button type="button" class="chip-preset" onclick="Activities.setPresetTitle('Quiz')">Quiz</button>
+                </div>
+
+                <div class="form-grid" style="margin-top:10px;">
+                    <div class="form-field full-span">
+                        <label class="form-label">Título de la Actividad o Evento *</label>
+                        <input type="text" class="form-input" id="actTitle" placeholder="Ej: Parcial I: Auditoría de Sistemas COBIT">
+                    </div>
+
+                    <!-- CAMPOS EXCLUSIVOS: MODALIDAD A (EVALUACIÓN DE MATERIA) -->
+                    <div id="fieldsModalidadA" class="form-field full-span" style="display:contents;">
+                        <div class="form-field full-span">
+                            <label class="form-label">Asignatura / Materia *</label>
+                            <select class="form-select" id="actSubject" onchange="Activities.onSubjectChange()">
+                                <option value="">— Selecciona una Materia —</option>
+                            </select>
+                        </div>
+
+                        <!-- Sugerencia de bloques según el horario -->
+                        <div class="form-field full-span" id="actSlotSuggestionsWrap" style="display:none;background:rgba(0,240,255,0.03);padding:10px;border-radius:var(--r-sm);border:1px dashed var(--border-act);">
+                            <span style="font-size:0.68rem;color:var(--cyan);font-weight:700;">Fechas y Horas de Clase según el Horario (Haz clic para aplicar):</span>
+                            <div class="slot-suggestions" id="actSlotSuggestions"></div>
+                        </div>
+
+                        <div class="form-field">
+                            <label class="form-label">Corte Académico *</label>
+                            <select class="form-select" id="actCorte">
+                                <option value="1">1er Corte</option>
+                                <option value="2">2do Corte</option>
+                                <option value="3">3er Corte</option>
+                                <option value="4">4to Corte</option>
+                            </select>
+                        </div>
+
+                        <div class="form-field">
+                            <label class="form-label">% Ponderación de la Nota *</label>
+                            <input type="number" class="form-input mono" id="actWeight" min="1" max="100" placeholder="Ej: 20" oninput="Activities.updateWeightAlert()">
+                            <div id="actWeightNotice" class="weight-notice-text"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Tipo de Actividad</label>
+                        <select class="form-select" id="actType">
+                            <option value="exam">Examen / Evaluación</option>
+                            <option value="assignment">Tarea / Trabajo</option>
+                            <option value="project">Proyecto</option>
+                            <option value="quiz">Quiz / Prueba Corta</option>
+                            <option value="event">Evento Especial</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Nivel de Prioridad *</label>
+                        <select class="form-select" id="actPriority">
+                            <option value="high">[ALTA] Alta Prioridad</option>
+                            <option value="medium" selected>[MEDIA] Media Prioridad</option>
+                            <option value="low">[BAJA] Baja Prioridad</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Fecha Límite *</label>
+                        <input type="date" class="form-input" id="actDate">
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Hora Límite</label>
+                        <input type="time" class="form-input" id="actTime">
+                    </div>
+
+                    <!-- DIRECTRICES Y PAUTAS ENRIQUECIDAS -->
+                    <div class="form-field full-span guidelines-card-form">
+                        <div class="guidelines-title">Directrices, Modalidad y Material de Apoyo</div>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label">Modalidad de Entrega</label>
+                                <select class="form-select" id="actMode" onchange="Activities.toggleGroupField()">
+                                    <option value="individual">Individual</option>
+                                    <option value="group">Grupal</option>
+                                </select>
+                            </div>
+
+                            <div class="form-field" id="actGroupMaxWrap" style="display:none;">
+                                <label class="form-label">Máx. Integrantes por Grupo</label>
+                                <input type="number" class="form-input" id="actGroupMax" min="2" max="10" placeholder="Ej: 3">
+                            </div>
+
+                            <div class="form-field">
+                                <label class="form-label">Formato de Entrega</label>
+                                <select class="form-select" id="actFormat">
+                                    <option value="pdf">Informe PDF / Documento</option>
+                                    <option value="github">Código / Repositorio GitHub</option>
+                                    <option value="slides">Diapositivas / Exposición</option>
+                                    <option value="in_person">Entrega Presencial en Aula</option>
+                                    <option value="link">Enlace Web / Drive</option>
+                                    <option value="other">Otro Formato</option>
+                                </select>
+                            </div>
+
+                            <div class="form-field full-span">
+                                <label class="form-label">Enlace a Material de Apoyo / Drive / Guía (Opcional)</label>
+                                <input type="url" class="form-input mono" id="actResourceLink" placeholder="https://drive.google.com/drive/folders/...">
+                            </div>
+
+                            <div class="form-field full-span">
+                                <label class="form-label">Pautas Detalladas e Instrucciones</label>
+                                <textarea class="form-input form-textarea" id="actDesc" rows="3" placeholder="Detalla los temas a evaluar, estructura del informe, criterios de evaluación, etc."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                    <button type="button" class="btn-ghost" onclick="Activities.closeModal(null,true)">Cancelar</button>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="btn-ghost btn-sm" onclick="Activities.saveFromForm('whatsapp')" title="Guardar y abrir WhatsApp con el aviso preformateado">
+                            Guardar & WhatsApp
+                        </button>
+                        <button type="button" class="btn-ghost btn-sm" onclick="Activities.saveFromForm('telegram')" title="Guardar y notificar en Telegram al grupo de la sección">
+                            Guardar & Telegram
+                        </button>
+                        <button type="button" class="btn-primary btn-sm" onclick="Activities.saveFromForm()">
+                            Guardar Actividad
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         MODAL: ACTIVITY DETAIL & DIRECTRICES
+    ════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="modalActivityDetail" onclick="Activities.closeDetailModal(event)">
+        <div class="modal-box modal-box-activity-detail" id="modalActivityDetailBox">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-color-dot" id="detailColorDot"></span>
+                    <span class="modal-title" id="detailSubjectName">Detalle de Actividad</span>
+                </div>
+                <button class="modal-close-btn" onclick="Activities.closeDetailModal(null, true)">&times;</button>
+            </div>
+            <div class="modal-body" id="detailModalBody">
+                <!-- Se llena dinámicamente con Activities.openDetailModal() -->
+            </div>
+    </div>
+
+    
+    <!-- ══════════════════ MODAL: PREFERENCIAS ══════════════════ -->
+    <div class="modal-overlay" id="modalPreferences" onclick="Prefs.closePanel(event)">
+        <div class="modal-box modal-box-prefs" id="modalPreferencesBox">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-color-dot" style="background:var(--cyan)"></span>
+                    <span class="modal-title">Preferencias del Sistema</span>
+                </div>
+                <button class="modal-close-btn" onclick="Prefs.closePanel(null, true)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Sección 1: Tema Visual -->
+                <div class="pref-section">
+                    <div class="pref-section-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                        Tema de Color
+                    </div>
+                    <div class="pref-theme-options">
+                        <button type="button" class="pref-theme-btn active" data-theme="dark_bcv">
+                            <div class="pref-theme-preview theme-preview-dark">
+                                <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#00f0ff"></span>
+                            </div>
+                            <span class="pref-theme-label">Oscuro BCV</span>
+                        </button>
+                        <button type="button" class="pref-theme-btn" data-theme="oled">
+                            <div class="pref-theme-preview theme-preview-oled">
+                                <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ffffff"></span>
+                            </div>
+                            <span class="pref-theme-label">Negro OLED</span>
+                        </button>
+                        <button type="button" class="pref-theme-btn" data-theme="light_hc">
+                            <div class="pref-theme-preview theme-preview-light">
+                                <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#090d16"></span>
+                            </div>
+                            <span class="pref-theme-label">Claro Contraste</span>
+                        </button>
+                    </div>
+
+                    <div style="margin-top:14px;">
+                        <span class="pref-label" style="font-size:0.75rem;margin-bottom:6px;">Color de Acento Principal</span>
+                        <div class="pref-accent-options">
+                            <button type="button" class="pref-accent-btn active" data-accent="cyan" style="background:#00f0ff;" title="Cyan Neón"></button>
+                            <button type="button" class="pref-accent-btn" data-accent="green" style="background:#00e5a0;" title="Verde Esmeralda"></button>
+                            <button type="button" class="pref-accent-btn" data-accent="orange" style="background:#ff9f43;" title="Ámbar Solar"></button>
+                            <button type="button" class="pref-accent-btn" data-accent="purple" style="background:#9b59b6;" title="Púrpura"></button>
+                            <button type="button" class="pref-accent-btn" data-accent="red" style="background:#ff2e5f;" title="Carmesí"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 2: Densidad e Interfaz -->
+                <div class="pref-section">
+                    <div class="pref-section-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                        Densidad e Interfaz
+                    </div>
+                    <div class="pref-row">
+                        <div class="pref-label-desc">
+                            <span class="pref-label">Densidad de Elementos</span>
+                            <span class="pref-desc">Ajusta el espaciado para ver más contenido en pantalla</span>
+                        </div>
+                        <div class="pref-density-group">
+                            <label class="pref-density-label">
+                                <input type="radio" name="prefDensity" value="standard" checked> Estándar
+                            </label>
+                            <label class="pref-density-label">
+                                <input type="radio" name="prefDensity" value="compact"> Compacto
+                            </label>
+                        </div>
+                    </div>
+                    <div class="pref-row" style="margin-top:12px;">
+                        <div class="pref-label-desc">
+                            <span class="pref-label">Vista Inicial</span>
+                            <span class="pref-desc">Pestaña con la que abre la aplicación</span>
+                        </div>
+                        <select class="form-select" id="prefDefaultTab" style="width:160px;padding:6px 10px;font-size:0.78rem;">
+                            <option value="dashboard">Dashboard</option>
+                            <option value="schedule">Horario</option>
+                            <option value="calendar">Timeline / Cal</option>
+                            <option value="grades">Mis Notas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Carga Académica de la Sección -->
+                <div class="pref-section">
+                    <div class="pref-section-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        Carga Académica (Sección 08S-2623-D1)
+                    </div>
+                    <p style="font-size:0.74rem;color:var(--text-2);margin-bottom:10px;">
+                        Oculta o muestra materias en tu horario y personaliza su color en tu dispositivo:
+                    </p>
+                    <div class="pref-subject-list" id="prefSubjectList">
+                        <!-- Renderizado por Prefs -->
+                    </div>
+                </div>
+
+                <!-- Sección 4: Suscripción Multi-Sección -->
+                <div class="pref-section">
+                    <div class="pref-section-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                        Suscripción por Código (Multi-Sección)
+                    </div>
+                    <p style="font-size:0.74rem;color:var(--text-2);margin-bottom:10px;">
+                        Inscribe materias de otras secciones. Si una materia se cruza en día y bloque, se mostrará como <b>[CHOQUE DE HORARIO]</b>.
+                    </p>
+                    <div style="display:flex;gap:8px;margin-bottom:8px;">
+                        <input type="text" class="form-input mono" id="inputSubscribeCode" placeholder="Ej: RED-08N, BD2-07D o SEG-08N" style="font-size:0.8rem;text-transform:uppercase;">
+                        <button type="button" class="btn-primary btn-sm" id="btnSubscribeCode" style="white-space:nowrap;">Suscribir</button>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--text-3);margin-bottom:12px;">
+                        Códigos de prueba: <code style="color:var(--cyan)">RED-08N</code> (Choque Mié), <code style="color:var(--cyan)">BD2-07D</code> (Choque Lun), <code style="color:var(--cyan)">SEG-08N</code> (Mar Libre).
+                    </div>
+                    <div id="prefSubscribedList">
+                        <!-- Renderizado por Prefs -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ BOTÓN FLOTANTE ADMIN ══════════════════ -->
+    <button class="admin-fab" id="btnOpenAdmin" title="Panel de Administración (Protegido por PIN)"
+        aria-label="Administración">
+        <span class="admin-fab-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <span class="admin-fab-label">Admin</span>
+        <span class="admin-fab-status local" id="adminModeDot" title="Modo Local"></span>
+    </button>
+
+    <!-- ══════════════════ MODAL: ACCESO DE ADMINISTRADOR (SUPABASE AUTH) ══════════════════ -->
+    <div class="modal-overlay" id="modalAdminPin" onclick="Admin.closePinModal(event)">
+        <div class="modal-box modal-box-auth" id="modalAdminPinBox" style="max-width:400px;">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-color-dot" style="background:var(--cyan)"></span>
+                    <span class="modal-title">Acceso de Administrador</span>
+                </div>
+                <button class="modal-close-btn" onclick="Admin.closePinModal(null, true)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Selector de Modo de Acceso -->
+                <div class="auth-tabs" style="display:flex;gap:6px;margin-bottom:14px;background:var(--bg-dark);padding:3px;border-radius:var(--r-sm);border:1px solid var(--border);">
+                    <button type="button" class="auth-tab-btn active" id="btnTabAuthSupabase" onclick="Admin.switchAuthMode('supabase')" style="flex:1;padding:6px;font-size:0.75rem;border:none;background:var(--cyan);color:var(--bg-darkest);font-weight:700;border-radius:4px;cursor:pointer;">
+                        Supabase Auth
+                    </button>
+                    <button type="button" class="auth-tab-btn" id="btnTabAuthPin" onclick="Admin.switchAuthMode('pin')" style="flex:1;padding:6px;font-size:0.75rem;border:none;background:transparent;color:var(--text-2);font-weight:600;border-radius:4px;cursor:pointer;">
+                        PIN Local
+                    </button>
+                </div>
+
+                <!-- ── FORMULARIO 1: SUPABASE AUTH (SESIÓN PERMANENTE) ── -->
+                <div id="authModeSupabase">
+                    <p class="pin-desc" style="text-align:left;margin-bottom:12px;font-size:0.78rem;">
+                        Inicia sesión con tu cuenta de Administrador. Tu sesión quedará <b>guardada de forma permanente</b> en este dispositivo.
+                    </p>
+                    <div id="adminAuthError" class="pin-error-msg" style="display:none;text-align:left;margin-bottom:10px;"></div>
+                    <div class="form-field" style="margin-bottom:10px;">
+                        <label class="form-label">Correo Electrónico</label>
+                        <input type="email" class="form-input" id="adminAuthEmail" placeholder="admin@universidad.edu.ve" autocomplete="email">
+                    </div>
+                    <div class="form-field" style="margin-bottom:14px;">
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" class="form-input" id="adminAuthPassword" placeholder="••••••••" autocomplete="current-password">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <button type="button" class="btn-primary" id="btnAdminLogin" onclick="Admin.submitAuthLogin()" style="width:100%;justify-content:center;">
+                            Iniciar Sesión Permanente
+                        </button>
+                        <button type="button" class="btn-ghost btn-sm" onclick="Admin.submitMagicLink()" style="width:100%;font-size:0.74rem;">
+                            Enviar Enlace Mágico al Correo
+                        </button>
+                    </div>
+                    <p style="font-size:0.68rem;color:var(--text-3);margin-top:12px;text-align:center;">
+                        Row Level Security (RLS) activo. Solo el Administrador autenticado puede modificar datos.
+                    </p>
+                </div>
+
+                <!-- ── FORMULARIO 2: PIN DE EMERGENCIA (MODO LOCAL) ── -->
+                <div id="authModePin" style="display:none;">
+                    <p class="pin-desc" style="text-align:center;margin-bottom:10px;font-size:0.78rem;">
+                        Acceso rápido de emergencia para configuración inicial en Modo Local.
+                    </p>
+                    <div class="pin-display">
+                        <input type="password" id="adminPinInput" class="pin-input" maxlength="8" placeholder="••••"
+                            autocomplete="off">
+                    </div>
+                    <div id="pinErrorMsg" class="pin-error-msg" style="display:none">PIN incorrecto. Inténtalo de nuevo.
+                    </div>
+
+                    <div class="pin-keypad">
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('1')">1</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('2')">2</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('3')">3</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('4')">4</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('5')">5</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('6')">6</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('7')">7</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('8')">8</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('9')">9</button>
+                        <button type="button" class="pin-btn pin-btn-sub" onclick="Admin.keypadClear()">C</button>
+                        <button type="button" class="pin-btn" onclick="Admin.keypadPress('0')">0</button>
+                        <button type="button" class="pin-btn pin-btn-act" onclick="Admin.submitPin()">↵</button>
+                    </div>
+                    <p class="pin-hint">PIN por defecto: <code>1234</code></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ MODAL: PANEL DE ADMINISTRACIÓN ══════════════════ -->
+    <div class="modal-overlay" id="modalAdminPanel" onclick="Admin.closeAdminPanel(event)">
+        <div class="modal-box modal-box-admin" id="modalAdminPanelBox">
+            <div class="modal-header admin-modal-header">
+                <div class="modal-title-wrap">
+                    <span class="modal-title">Panel de Administración</span>
+                    <span class="admin-badge-mode mode-local" id="adminStatusBadge">Modo Local</span>
+                </div>
+                <div class="admin-header-actions">
+                    <button class="btn-ghost btn-sm" onclick="Admin.lockSession()">Bloquear</button>
+                    <button class="modal-close-btn" onclick="Admin.closeAdminPanel(null, true)">&times;</button>
+                </div>
+            </div>
+
+            <!-- Admin Sub-tabs Navigation -->
+            <div class="admin-nav-tabs">
+                <button class="admin-tab-btn active" data-atab="subjects" onclick="Admin.switchTab('subjects')">
+                    Horario & Materias
+                </button>
+                <button class="admin-tab-btn" data-atab="activities" onclick="Admin.switchTab('activities')">
+                    Actividades Globales
+                </button>
+                <button class="admin-tab-btn" data-atab="section" onclick="Admin.switchTab('section')">
+                    Configuración Sección
+                </button>
+                <button class="admin-tab-btn" data-atab="system" onclick="Admin.switchTab('system')">
+                    Sistema & Supabase
+                </button>
+            </div>
+
+            <div class="modal-body admin-modal-body">
+                <!-- ── TAB 1: HORARIO & MATERIAS ── -->
+                <div class="admin-tab-panel active" id="atab-subjects">
+                    <div class="admin-top-bar">
+                        <span style="font-size:0.82rem;color:var(--text-2);">Gestión de asignaturas y bloques de 45
+                            minutos</span>
+                        <button class="btn-primary btn-sm" onclick="Admin.openNewSubject()">Nueva Materia</button>
+                    </div>
+                    <div id="adminSubjectsList"></div>
+                </div>
+
+                <!-- ── TAB 2: ACTIVIDADES GLOBALES ── -->
+                <div class="admin-tab-panel" id="atab-activities">
+                    <div class="admin-top-bar">
+                        <span style="font-size:0.82rem;color:var(--text-2);">Evaluaciones y eventos visibles para toda
+                            la sección</span>
+                        <button class="btn-primary btn-sm" onclick="App.openNewActivity()">Nueva Actividad</button>
+                    </div>
+                    <div id="adminActivitiesList"></div>
+                </div>
+
+                <!-- ── TAB 3: CONFIGURACIÓN SECCIÓN ── -->
+                <div class="admin-tab-panel" id="atab-section">
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Datos de la Carrera y Sección</div>
+                        <div class="admin-card-desc">Personaliza la información mostrada en el encabezado y reportes.
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label">Carrera</label>
+                                <input type="text" class="form-input" id="setCarrera"
+                                    placeholder="INGENIERÍA DE SISTEMAS">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Semestre</label>
+                                <input type="text" class="form-input" id="setSemestre" placeholder="VIII">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Sección</label>
+                                <input type="text" class="form-input" id="setSeccion" placeholder="08S-2623-D1">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Período / Turno</label>
+                                <input type="text" class="form-input" id="setPeriodo" placeholder="2026-I (Diurno)">
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;text-align:right;">
+                            <button class="btn-primary btn-sm" onclick="Admin.saveSectionSettings()">Guardar Datos de
+                                Sección</button>
+                        </div>
+                    </div>
+
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Seguridad de Administrador</div>
+                        <div class="admin-card-desc">Cambia el PIN de acceso al panel administrativo.</div>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label">PIN Actual</label>
+                                <input type="password" class="form-input" id="inputOldPin" placeholder="PIN actual">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Nuevo PIN (mínimo 4 dígitos)</label>
+                                <input type="password" class="form-input" id="inputNewPin" placeholder="Nuevo PIN">
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;text-align:right;">
+                            <button class="btn-primary btn-sm" onclick="Admin.changePin()">Actualizar PIN</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── TAB 4: SISTEMA & SUPABASE ── -->
+                <div class="admin-tab-panel" id="atab-system">
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Sincronización en la Nube (Supabase PostgreSQL + Realtime)</div>
+                        <div class="admin-card-desc">
+                            Conecta tu proyecto de Supabase para que toda la sección reciba los datos en tiempo real mediante Row Level Security (RLS).
+                            Si dejas los campos vacíos, funcionará en <b>Modo Local (localStorage)</b>.
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-field full-span">
+                                <label class="form-label">Project URL (Supabase URL)</label>
+                                <input type="text" class="form-input mono" id="sbProjectUrl" placeholder="https://tu-proyecto.supabase.co">
+                            </div>
+                            <div class="form-field full-span">
+                                <label class="form-label">API Key Anónima (anon public key)</label>
+                                <input type="text" class="form-input mono" id="sbAnonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                            <span id="sbConnectionStatus" style="font-size:0.75rem;color:var(--text-2);">Estado: Verificando conexión...</span>
+                            <button class="btn-primary btn-sm" onclick="Admin.saveSupabaseSettings()">Guardar y Conectar Supabase</button>
+                        </div>
+                    </div>
+
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Sesión del Administrador (Supabase Auth)</div>
+                        <div class="admin-card-desc">
+                            Estado de la cuenta autenticada con permisos exclusivos de publicación.
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                            <div id="sbAdminAccountDisplay" style="font-size:0.8rem;color:var(--cyan);font-weight:600;">
+                                Verificando sesión...
+                            </div>
+                            <button class="btn-ghost btn-sm text-danger" onclick="Admin.lockSession()">Cerrar Sesión de Administrador</button>
+                        </div>
+                    </div>
+
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Integración con Bot de Telegram</div>
+                        <div class="admin-card-desc">Envía alertas y avisos de clase directamente a un canal o grupo de
+                            Telegram de la sección.</div>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label">Telegram Bot Token</label>
+                                <input type="text" class="form-input mono" id="tgBotToken"
+                                    placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Chat ID / Canal (@nombre o -100xxx)</label>
+                                <input type="text" class="form-input mono" id="tgChatId" placeholder="-1001234567890">
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;text-align:right;">
+                            <button class="btn-primary btn-sm" onclick="Admin.saveTelegramSettings()">Guardar Config
+                                Telegram</button>
+                        </div>
+                    </div>
+
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Copia de Seguridad y Restauración</div>
+                        <div class="admin-card-desc">Exporta todos los datos en formato JSON o importa un backup previo.
+                        </div>
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                            <button class="btn-primary btn-sm" onclick="Admin.exportBackup()">Descargar Copia de
+                                Seguridad (JSON)</button>
+                            <label class="btn-ghost btn-sm" style="cursor:pointer;margin:0;">
+                                Restaurar desde JSON
+                                <input type="file" id="backupFileInput" accept=".json" style="display:none"
+                                    onchange="Admin.importBackup(this)">
+                            </label>
+                            <button class="btn-ghost btn-sm text-danger" onclick="Admin.factoryReset()"
+                                style="margin-left:auto;">Restablecer a Fábrica</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ MODAL: EDITAR / CREAR MATERIA ══════════════════ -->
+    <div class="modal-overlay" id="modalEditSubject" onclick="Admin.closeSubjectModal(event)">
+        <div class="modal-box" id="modalEditSubjectBox" style="max-width:680px;">
+            <div class="modal-header">
+                <span class="modal-title" id="subjModalTitle">Nueva Materia</span>
+                <button class="modal-close-btn" onclick="Admin.closeSubjectModal(null, true)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-field full-span">
+                        <label class="form-label">Nombre Completo de la Asignatura *</label>
+                        <input type="text" class="form-input" id="editSubjName" placeholder="Ej: AUDITORÍA DE SISTEMAS">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label">Siglas / Nombre Corto</label>
+                        <input type="text" class="form-input" id="editSubjShort" placeholder="Ej: AUD">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label">Color Distintivo</label>
+                        <input type="color" class="form-input" id="editSubjColor" value="#00f0ff"
+                            style="height:42px;padding:2px 4px;cursor:pointer;">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label">Aula / Laboratorio</label>
+                        <input type="text" class="form-input" id="editSubjRoom" placeholder="Ej: YSSF-010">
+                    </div>
+                    <div class="form-field">
+                        <label class="form-label">Código de Materia</label>
+                        <input type="text" class="form-input" id="editSubjCode" placeholder="Ej: SIS-801">
+                    </div>
+                    <div class="form-field full-span">
+                        <label class="form-label">Profesor / Docente</label>
+                        <input type="text" class="form-input" id="editSubjTeacher" placeholder="Ej: Ing. Carlos Pérez">
+                    </div>
+                </div>
+
+                <div style="margin-top:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span class="form-label">Bloques Semanales de Clase</span>
+                        <button type="button" class="btn-ghost btn-sm" onclick="Admin.addSlotRow(0,1,1)">Añadir
+                            Bloque</button>
+                    </div>
+                    <div id="editSubjSlotsList"></div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn-ghost" onclick="Admin.closeSubjectModal(null,true)">Cancelar</button>
+                    <button class="btn-primary" onclick="Admin.saveSubject()">Guardar Materia</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/preferences.js"></script>
+    <script src="js/notify.js"></script>
+    <script src="js/schedule.js"></script>
+    <script src="js/activities.js"></script>
+    <script src="js/student.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+
+</html>

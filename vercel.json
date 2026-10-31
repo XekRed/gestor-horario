@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "gestor-academico-xk",
+  "crons": [
+    {
+      "path": "/api/morning-digest",
+      "schedule": "30 10 * * *"
+    }
+  ]
+}
