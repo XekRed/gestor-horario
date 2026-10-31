@@ -317,6 +317,16 @@ const Admin = (() => {
             if (fabDot) fabDot.className = isUnlocked ? 'admin-fab-status online' : 'admin-fab-status local';
             if (fab) fab.title = isUnlocked ? 'Panel Admin (Sesión Activa)' : 'Acceso de Administrador (PIN)';
         }
+
+        const headerText = document.getElementById('btnHeaderAdminText');
+        const headerDot = document.getElementById('headerAdminModeDot');
+        if (headerText) {
+            headerText.textContent = isUnlocked ? 'Admin (Activo)' : 'Admin';
+        }
+        if (headerDot) {
+            headerDot.style.background = isUnlocked ? 'var(--green)' : (isSb ? 'var(--cyan)' : 'var(--orange)');
+            headerDot.style.boxShadow = `0 0 6px ${isUnlocked ? 'var(--green)' : 'var(--cyan)'}`;
+        }
     }
 
     /* ══════════════════════════════════════════════════════════
