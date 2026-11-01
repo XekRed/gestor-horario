@@ -665,6 +665,7 @@ const Activities = (() => {
         const activities = (typeof DB !== 'undefined' ? DB.get('activities') : []) || [];
         const subjects = typeof Schedule !== 'undefined' ? Schedule.getSubjects() : [];
         const isAdmin = typeof DB !== 'undefined' && DB.isAdminUnlocked();
+        const enrolledIds = (typeof Student !== 'undefined') ? Student.getEnrolledSubjectIds() : [];
 
         // Filtros
         const subjFilter = document.getElementById('tlFilterMateria')?.value || 'all';
@@ -673,6 +674,7 @@ const Activities = (() => {
         const modalidadFilter = document.getElementById('tlFilterModalidad')?.value || 'all';
 
         let filtered = activities.filter(a => {
+            if (!isAdmin && a.modality !== 'special' && a.subjectId && !enrolledIds.includes(a.subjectId)) return false;
             if (subjFilter !== 'all' && a.subjectId !== subjFilter) return false;
             if (corteFilter !== 'all' && String(a.corte) !== String(corteFilter)) return false;
             if (priorityFilter !== 'all' && a.priority !== priorityFilter) return false;
@@ -789,6 +791,8 @@ const Activities = (() => {
 
         const activities = (typeof DB !== 'undefined' ? DB.get('activities') : []) || [];
         const subjects = typeof Schedule !== 'undefined' ? Schedule.getSubjects() : [];
+        const isAdmin = typeof DB !== 'undefined' && DB.isAdminUnlocked();
+        const enrolledIds = (typeof Student !== 'undefined') ? Student.getEnrolledSubjectIds() : [];
         const grid = document.getElementById('calendarGrid');
         if (!grid) return;
 
@@ -811,7 +815,11 @@ const Activities = (() => {
             const isToday = dayDate.getTime() === today.getTime();
             const isSel = _selectedCalDate === dateStr;
 
-            const dayActs = activities.filter(a => a.date === dateStr);
+            const dayActs = activities.filter(a => {
+                if (a.date !== dateStr) return false;
+                if (!isAdmin && a.modality !== 'special' && a.subjectId && !enrolledIds.includes(a.subjectId)) return false;
+                return true;
+            });
 
             const pills = dayActs.slice(0, 3).map(a => {
                 const subj = subjects.find(s => s.id === a.subjectId);
@@ -850,7 +858,14 @@ const Activities = (() => {
         const panel = document.getElementById('calEventsPanel');
         if (!panel) return;
 
-        const acts = (typeof DB !== 'undefined' ? DB.get('activities') : []).filter(a => a.date === dateStr);
+        const isAdmin = typeof DB !== 'undefined' && DB.isAdminUnlocked();
+        const enrolledIds = (typeof Student !== 'undefined') ? Student.getEnrolledSubjectIds() : [];
+        const allActs = (typeof DB !== 'undefined' ? DB.get('activities') : []) || [];
+        const acts = allActs.filter(a => {
+            if (a.date !== dateStr) return false;
+            if (!isAdmin && a.modality !== 'special' && a.subjectId && !enrolledIds.includes(a.subjectId)) return false;
+            return true;
+        });
         const [y, m, d] = dateStr.split('-').map(Number);
         const dayDate = new Date(y, m - 1, d);
         const dayName = DAYS_ES[dayDate.getDay()];

@@ -92,7 +92,34 @@ create table if not exists public.activities (
 );
 
 -- ═════════════════════════════════════════════════════════════
--- 7. TABLA: student_grades (Calificaciones & Puente para Profesores)
+-- 7. TABLA: students (Ficha del Estudiante Sincronizada por Cédula)
+-- ═════════════════════════════════════════════════════════════
+create table if not exists public.students (
+    ci text primary key,
+    full_name text not null,
+    career text not null default 'INGENIERÍA DE SISTEMAS',
+    section_code text not null default '08S-2623-D1',
+    pin text default null,
+    preferences jsonb default '{}'::jsonb,
+    created_at timestamptz default timezone('utc'::text, now()) not null,
+    updated_at timestamptz default timezone('utc'::text, now()) not null
+);
+
+-- ═════════════════════════════════════════════════════════════
+-- 8. TABLA: student_enrollments (Materias Inscritas por Estudiante)
+-- ═════════════════════════════════════════════════════════════
+create table if not exists public.student_enrollments (
+    id uuid primary key default gen_random_uuid(),
+    student_ci text not null references public.students(ci) on delete cascade,
+    subject_id text not null,
+    subject_code text not null,
+    section_code text not null default '08S-2623-D1',
+    enrolled_at timestamptz default timezone('utc'::text, now()) not null,
+    constraint unique_student_subject unique(student_ci, subject_id)
+);
+
+-- ═════════════════════════════════════════════════════════════
+-- 9. TABLA: student_grades (Calificaciones & Puente para Profesores)
 -- ═════════════════════════════════════════════════════════════
 create table if not exists public.student_grades (
     id uuid primary key default gen_random_uuid(),
@@ -270,6 +297,22 @@ create policy "Gestion de student_grades"
     or (auth.role() = 'authenticated' and is_official_locked = false)
   );
 
+-- 9.4. Políticas de Acceso Estudiantil (Identificación y Matrícula)
+alter table public.students enable row level security;
+alter table public.student_enrollments enable row level security;
+
+drop policy if exists "Acceso total a students" on public.students;
+create policy "Acceso total a students"
+  on public.students for all to anon, authenticated
+  using (true)
+  with check (true);
+
+drop policy if exists "Acceso total a student_enrollments" on public.student_enrollments;
+create policy "Acceso total a student_enrollments"
+  on public.student_enrollments for all to anon, authenticated
+  using (true)
+  with check (true);
+
 -- ═════════════════════════════════════════════════════════════
 -- 10. ACTIVACIÓN DE SUPABASE REALTIME
 -- ═════════════════════════════════════════════════════════════
@@ -297,6 +340,14 @@ begin
     end;
     begin
         execute 'alter publication supabase_realtime add table public.student_grades';
+    exception when others then null;
+    end;
+    begin
+        execute 'alter publication supabase_realtime add table public.students';
+    exception when others then null;
+    end;
+    begin
+        execute 'alter publication supabase_realtime add table public.student_enrollments';
     exception when others then null;
     end;
 end $$;

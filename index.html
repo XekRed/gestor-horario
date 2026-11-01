@@ -62,6 +62,11 @@
                         <span class="meta-label">SECCIÓN</span>
                         <span class="meta-value mono" id="metaSeccion">08S-2623-D1</span>
                     </div>
+                    <div class="meta-sep" id="metaStudentSep" style="display:none;">·</div>
+                    <div class="meta-badge" id="metaStudentBadge" style="display:none;cursor:pointer;" onclick="Student.openIdentificationModal()" title="Gestionar Perfil Estudiantil">
+                        <span class="meta-label">ESTUDIANTE</span>
+                        <span class="meta-value" id="metaStudentName">—</span>
+                    </div>
                 </div>
 
                 <div class="header-right">
@@ -184,6 +189,7 @@
                         </div>
                         <div class="quick-actions">
                             <button class="qa-btn" onclick="App.switchTab('schedule')">Ver Horario</button>
+                            <button class="qa-btn" onclick="Student.openEnrollModal()" style="border-color:rgba(0,240,255,0.4);color:var(--cyan);background:rgba(0,240,255,0.06);font-weight:600;">Inscribir Materias</button>
                             <button class="qa-btn" onclick="App.openNewActivity()">Nueva Actividad</button>
                             <button class="qa-btn" onclick="App.switchTab('calendar')">Timeline</button>
                             <button class="qa-btn" onclick="App.switchTab('grades')">Mis Notas</button>
@@ -204,8 +210,15 @@
                         <h2 class="section-title">Horario de Clases</h2>
                         <p class="section-sub">Lunes a Sábado · Bloques de 45 minutos · Semestre VIII</p>
                     </div>
-                    <div class="schedule-legend" id="scheduleLegend"></div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <button class="btn-primary btn-sm" onclick="Student.openEnrollModal()" style="display:flex;align-items:center;gap:6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                            Inscribir Materias
+                        </button>
+                        <div class="schedule-legend" id="scheduleLegend"></div>
+                    </div>
                 </div>
+                <div id="scheduleEmptyAlert"></div>
                 <div class="schedule-scroll-wrap">
                     <div class="schedule-table-wrap">
                         <table class="schedule-table" id="scheduleTable">
@@ -1057,6 +1070,138 @@
                 <div class="form-actions">
                     <button class="btn-ghost" onclick="Admin.closeSubjectModal(null,true)">Cancelar</button>
                     <button class="btn-primary" onclick="Admin.saveSubject()">Guardar Materia</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ MODAL: IDENTIFICACIÓN ESTUDIANTIL ══════════════════ -->
+    <div class="modal-overlay" id="modalStudentLogin" onclick="Student.closeIdentificationModal(false)">
+        <div class="modal-box modal-box-student-login" id="modalStudentLoginBox" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="color:var(--cyan);"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span class="modal-title">Identificación Estudiantil</span>
+                </div>
+                <button class="modal-close-btn" onclick="Student.closeIdentificationModal(true)">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="student-id-tabs">
+                    <button type="button" class="student-id-tab active" id="btnIdTabNew" onclick="Student.switchIdTab('new')">
+                        Nuevo Estudiante
+                    </button>
+                    <button type="button" class="student-id-tab" id="btnIdTabExisting" onclick="Student.switchIdTab('existing')">
+                        Ya Tengo Cédula
+                    </button>
+                </div>
+
+                <div id="studentLoginErrorMsg" class="student-login-err" style="display:none;"></div>
+
+                <!-- PANEL: NUEVO ESTUDIANTE -->
+                <div id="panelIdNew">
+                    <p style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.45;">
+                        Ingresa tus datos para inicializar tu horario universitario en blanco y sincronizar tus notas con tu Cédula de Identidad.
+                    </p>
+                    <div class="form-grid">
+                        <div class="form-field full-span">
+                            <label class="form-label">Nombre Completo *</label>
+                            <input type="text" class="form-input" id="studentRegName" placeholder="Ej: Jesús David Romero" autocomplete="name">
+                        </div>
+                        <div class="form-field full-span">
+                            <label class="form-label">Cédula de Identidad *</label>
+                            <input type="text" class="form-input mono" id="studentRegCi" placeholder="Ej: V-28123456" autocomplete="username">
+                        </div>
+                        <div class="form-field">
+                            <label class="form-label">Carrera</label>
+                            <input type="text" class="form-input" id="studentRegCareer" value="INGENIERÍA DE SISTEMAS">
+                        </div>
+                        <div class="form-field">
+                            <label class="form-label">Código de Sección</label>
+                            <input type="text" class="form-input mono" id="studentRegSection" value="08S-2623-D1">
+                        </div>
+                    </div>
+                    <div class="form-actions" style="margin-top:18px;">
+                        <button type="button" class="btn-primary" style="width:100%;justify-content:center;" onclick="Student.submitNewStudentForm()">
+                            Comenzar (Horario en Blanco)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PANEL: YA TENGO CÉDULA -->
+                <div id="panelIdExisting" style="display:none;">
+                    <p style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.45;">
+                        Ingresa tu Cédula para recuperar tus materias inscritas, notas y configuración en este dispositivo.
+                    </p>
+                    <div class="form-grid">
+                        <div class="form-field full-span">
+                            <label class="form-label">Cédula de Identidad *</label>
+                            <input type="text" class="form-input mono" id="studentLoginCi" placeholder="Ej: V-28123456" autocomplete="username">
+                        </div>
+                        <div class="form-field full-span" id="existingPinWrap" style="display:none;">
+                            <label class="form-label">PIN de Seguridad (Perfil Protegido)</label>
+                            <input type="password" class="form-input mono" id="studentLoginPin" maxlength="6" placeholder="PIN de 4-6 dígitos">
+                        </div>
+                    </div>
+                    <div class="form-actions" style="margin-top:18px;">
+                        <button type="button" class="btn-primary" style="width:100%;justify-content:center;" onclick="Student.submitExistingStudentForm()">
+                            Cargar Mi Horario y Notas
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════ MODAL: INSCRIBIR MATERIAS ══════════════════ -->
+    <div class="modal-overlay" id="modalEnrollment" onclick="Student.closeEnrollModal(event)">
+        <div class="modal-box modal-box-enroll" id="modalEnrollmentBox" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="color:var(--cyan);"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+                        <span class="modal-title">Inscribir Materias</span>
+                    </div>
+                    <span class="enroll-counter-badge mono" id="enrollCounterBadge">0 Materias Inscritas</span>
+                </div>
+                <button class="modal-close-btn" onclick="Student.closeEnrollModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:16px 20px;">
+                <!-- SEARCH & FILTER BAR -->
+                <div class="enroll-search-bar">
+                    <div class="enroll-search-input-wrap">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" class="search-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        <input type="text" class="form-input" id="inputEnrollSearch" placeholder="Buscar por código de materia (ej: AUD-08S, TEL, IA)..." oninput="Student.onEnrollSearch(this.value)">
+                    </div>
+                    <div class="enroll-filter-chips">
+                        <button type="button" class="enroll-filter-chip active" data-filter="section" onclick="Student.setEnrollFilter('section')">
+                            Mi Sección (<span id="enrollBadgeSection">08S-2623-D1</span>)
+                        </button>
+                        <button type="button" class="enroll-filter-chip" data-filter="all" onclick="Student.setEnrollFilter('all')">
+                            Todas
+                        </button>
+                        <button type="button" class="enroll-filter-chip" data-filter="enrolled" onclick="Student.setEnrollFilter('enrolled')">
+                            Inscritas
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2-COLUMN SPLIT GRID -->
+                <div class="enroll-split-grid">
+                    <!-- LEFT: SUBJECTS LIST -->
+                    <div class="enroll-list-col">
+                        <div class="enroll-sec-title">Catálogo de Asignaturas</div>
+                        <div class="enroll-subjects-list" id="enrollSubjectsList">
+                            <!-- Rendered by Student.renderEnrollSubjectsList() -->
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: PREVIEW PANEL & CONFLICTS -->
+                    <div class="enroll-preview-col">
+                        <div class="enroll-sec-title">Vista Previa y Horario</div>
+                        <div class="enroll-preview-panel" id="enrollPreviewContainer">
+                            <!-- Rendered by Student.renderEnrollPreview() -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -59,6 +59,9 @@ const App = (() => {
 
         // Init sub-modules
         if (typeof Prefs !== 'undefined') Prefs.init();
+        if (typeof Student !== 'undefined') {
+            Student.updateHeaderProfile();
+        }
         Schedule.init();
 
         // Clock
@@ -98,6 +101,11 @@ const App = (() => {
         renderGrades();
         if (typeof Prefs !== 'undefined') switchTab(Prefs.getDefaultTab());
         if (window.lucide) lucide.createIcons();
+
+        // Si no tiene perfil activo guardado, abrir ventana de bienvenida e identificación
+        if (typeof Student !== 'undefined' && !Student.hasActiveProfile()) {
+            setTimeout(() => Student.openIdentificationModal(), 300);
+        }
     }
 
     /* ── SETTINGS ───────────────────────────────────────────── */
@@ -178,7 +186,9 @@ const App = (() => {
     ════════════════════════════════════════════════════════ */
     function renderDashboard() {
         const subjects   = Schedule.getSubjects();
-        const activities = getActivities();
+        const allActivities = getActivities();
+        const enrolledIds = subjects.map(s => s.id);
+        const activities = allActivities.filter(a => a.modality === 'special' || !a.subjectId || enrolledIds.includes(a.subjectId));
         const now        = new Date(); now.setHours(0,0,0,0);
 
         /* Today's classes */

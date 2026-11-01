@@ -188,37 +188,36 @@ const Schedule = (() => {
         }
     }
 
+    function getAllCatalogSubjects() {
+        const secList = (typeof DB !== 'undefined' ? DB.get('subjects') : []) || subjects || SEED_SUBJECTS;
+        const ext = (typeof Prefs !== 'undefined' && Prefs.getExternalCatalog) ? Prefs.getExternalCatalog() : [];
+        const combined = [...secList];
+        ext.forEach(e => {
+            if (!combined.some(s => s.id === e.id || (s.code && s.code === e.code))) {
+                combined.push(e);
+            }
+        });
+        return combined;
+    }
+
+    function getActiveSubjects() {
+        if (typeof Student !== 'undefined' && Student.getEnrolledSubjects) {
+            let enrolled = Student.getEnrolledSubjects();
+            if (typeof Prefs !== 'undefined') {
+                enrolled = enrolled.filter(s => !Prefs.isSubjectHidden(s.id));
+            }
+            return enrolled;
+        }
+        return [];
+    }
+
     function getSubjects() {
-        return subjects;
+        return getActiveSubjects();
     }
 
     function getSubjectById(id) {
-        const found = subjects.find(s => s.id === id);
-        if (found) return found;
-        if (typeof Prefs !== 'undefined') {
-            const ext = Prefs.getSubscribedSubjects().find(s => s.id === id);
-            if (ext) return ext;
-        }
-        return null;
-    }
-
-    /* ── MATERIAS ACTIVAS (FILTRADAS + SUSCRIPCIONES) ─────────── */
-    function getActiveSubjects() {
-        let active = subjects.slice();
-
-        if (typeof Prefs !== 'undefined') {
-            // Excluir materias que el usuario decidió ocultar en su horario
-            active = active.filter(s => !Prefs.isSubjectHidden(s.id));
-
-            // Agregar materias externas a las que se suscribió
-            const subs = Prefs.getSubscribedSubjects();
-            subs.forEach(sub => {
-                if (!active.some(s => s.id === sub.id)) {
-                    active.push(sub);
-                }
-            });
-        }
-        return active;
+        const all = getAllCatalogSubjects();
+        return all.find(s => s.id === id) || null;
     }
 
     /* ── CONSTRUCTOR DE GRILLA CON DETECCIÓN DE CHOQUES ───────── */
@@ -347,6 +346,30 @@ const Schedule = (() => {
     function renderTable() {
         const table = document.getElementById('scheduleTable');
         if (!table) return;
+
+        const emptyAlert = document.getElementById('scheduleEmptyAlert');
+        const active = getActiveSubjects();
+        if (emptyAlert) {
+            if (active.length === 0) {
+                emptyAlert.innerHTML = `
+                    <div class="empty-schedule-alert" style="margin-bottom:14px;padding:16px 20px;background:rgba(0,240,255,0.05);border:1px dashed rgba(0,240,255,0.3);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-weight:700;color:var(--cyan);font-size:0.88rem;margin-bottom:3px;display:flex;align-items:center;gap:6px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                Horario en Blanco (0 Materias Inscritas)
+                            </div>
+                            <div style="font-size:0.76rem;color:var(--text-2);">Tu horario inicia vacío. Haz clic en "Inscribir Materias" para seleccionar tus asignaturas y ver sus bloques y evaluaciones.</div>
+                        </div>
+                        <button class="btn-primary btn-sm" onclick="Student.openEnrollModal()" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Inscribir Materias
+                        </button>
+                    </div>
+                `;
+            } else {
+                emptyAlert.innerHTML = '';
+            }
+        }
 
         const today = new Date().getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
         const todayCol = (today >= 1 && today <= 6) ? (today - 1) : -1;
@@ -502,6 +525,10 @@ const Schedule = (() => {
         const el = document.getElementById('scheduleLegend');
         if (!el) return;
         const active = getActiveSubjects();
+        if (active.length === 0) {
+            el.innerHTML = '<span style="font-size:0.75rem;color:var(--text-3);padding:4px 0;">0 asignaturas inscritas</span>';
+            return;
+        }
         el.innerHTML = active.map(s => {
             const displayColor = (typeof Prefs !== 'undefined') ? Prefs.getSubjectColor(s.id, s.color) : s.color;
             return `
@@ -515,12 +542,11 @@ const Schedule = (() => {
     /* ── SELECTORES DE MATERIA EN FORMULARIOS ─────────────────── */
     function populateSubjectSelects() {
         const selects = [
-            document.getElementById('actSubject'),
-            document.getElementById('tlFilterMateria'),
+            { el: document.getElementById('actSubject'), list: getAllCatalogSubjects() },
+            { el: document.getElementById('tlFilterMateria'), list: getActiveSubjects() },
         ];
-        const active = getActiveSubjects();
 
-        selects.forEach(sel => {
+        selects.forEach(({ el: sel, list }) => {
             if (!sel) return;
             const first = sel.querySelector('option');
             sel.innerHTML = '';
@@ -532,7 +558,7 @@ const Schedule = (() => {
                 opt.textContent = 'Todas las materias';
                 sel.appendChild(opt);
             }
-            active.forEach(s => {
+            list.forEach(s => {
                 const opt = document.createElement('option');
                 opt.value = s.id;
                 opt.textContent = s.code ? `[${s.code}] ${s.name}` : s.name;
@@ -724,6 +750,7 @@ const Schedule = (() => {
         closeModal,
         getSubjects,
         getActiveSubjects,
+        getAllCatalogSubjects,
         getSubjectById,
         getTodayClasses,
         getNextClass,

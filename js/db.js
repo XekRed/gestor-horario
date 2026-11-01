@@ -783,6 +783,123 @@ const DB = (() => {
         return true;
     }
 
+    /* ══════════════════════════════════════════════════════════
+       GESTIÓN DE ESTUDIANTES Y MATRÍCULA (SUPABASE / LOCAL)
+    ═══════════════════════════════════════════════════════════ */
+    async function getStudentByCi(ci) {
+        if (!ci) return null;
+        const cleanCi = ci.trim().toUpperCase();
+        if (_supabase) {
+            try {
+                const { data, error } = await _supabase
+                    .from('students')
+                    .select('*')
+                    .eq('ci', cleanCi)
+                    .maybeSingle();
+                if (!error && data) return data;
+            } catch (e) {
+                console.warn('[DB] Error consultando estudiante en Supabase:', e);
+            }
+        }
+        // Fallback local
+        const local = localStorage.getItem('gx_student_profile');
+        if (local) {
+            try {
+                const parsed = JSON.parse(local);
+                if (parsed.ci && parsed.ci.toUpperCase() === cleanCi) return parsed;
+            } catch (e) {}
+        }
+        return null;
+    }
+
+    async function saveStudent(studentData) {
+        if (!studentData || !studentData.ci) return null;
+        const cleanCi = studentData.ci.trim().toUpperCase();
+        const payload = {
+            ci: cleanCi,
+            full_name: (studentData.fullName || studentData.full_name || '').trim(),
+            career: studentData.career || 'INGENIERÍA DE SISTEMAS',
+            section_code: studentData.sectionCode || studentData.section_code || '08S-2623-D1',
+            pin: studentData.pin || null,
+            preferences: studentData.preferences || {},
+            updated_at: new Date().toISOString()
+        };
+
+        if (_supabase) {
+            try {
+                const { data, error } = await _supabase
+                    .from('students')
+                    .upsert(payload, { onConflict: 'ci' })
+                    .select()
+                    .maybeSingle();
+                if (error) console.warn('[DB] Error guardando estudiante en Supabase:', error);
+                else if (data) return data;
+            } catch (e) {
+                console.warn('[DB] Fallback al guardar estudiante:', e);
+            }
+        }
+        return payload;
+    }
+
+    async function getStudentEnrollments(studentCi) {
+        if (!studentCi) return [];
+        const cleanCi = studentCi.trim().toUpperCase();
+        if (_supabase) {
+            try {
+                const { data, error } = await _supabase
+                    .from('student_enrollments')
+                    .select('*')
+                    .eq('student_ci', cleanCi);
+                if (!error && data) return data;
+            } catch (e) {
+                console.warn('[DB] Error consultando inscripciones en Supabase:', e);
+            }
+        }
+        const local = localStorage.getItem('gx_student_enrolled_ids');
+        return local ? JSON.parse(local) : [];
+    }
+
+    async function enrollStudentSubject(studentCi, subject) {
+        if (!studentCi || !subject) return false;
+        const cleanCi = studentCi.trim().toUpperCase();
+        const settings = getSettings();
+        const payload = {
+            student_ci: cleanCi,
+            subject_id: subject.id,
+            subject_code: subject.code || subject.shortName || subject.id,
+            section_code: subject.section || settings.seccion || '08S-2623-D1',
+            enrolled_at: new Date().toISOString()
+        };
+
+        if (_supabase) {
+            try {
+                await _supabase
+                    .from('student_enrollments')
+                    .upsert(payload, { onConflict: 'student_ci,subject_id' });
+            } catch (e) {
+                console.warn('[DB] Error inscribiendo materia en Supabase:', e);
+            }
+        }
+        return true;
+    }
+
+    async function unenrollStudentSubject(studentCi, subjectId) {
+        if (!studentCi || !subjectId) return false;
+        const cleanCi = studentCi.trim().toUpperCase();
+        if (_supabase) {
+            try {
+                await _supabase
+                    .from('student_enrollments')
+                    .delete()
+                    .eq('student_ci', cleanCi)
+                    .eq('subject_id', subjectId);
+            } catch (e) {
+                console.warn('[DB] Error retirando materia en Supabase:', e);
+            }
+        }
+        return true;
+    }
+
     /* ── PIN DE EMERGENCIA (MODO LOCAL) ── */
     function getPin()      { return localStorage.getItem(LS.pin) || '1234'; }
     function savePin(pin)  { localStorage.setItem(LS.pin, String(pin)); }
@@ -855,6 +972,11 @@ const DB = (() => {
         getSectionAdmins,
         addSectionAdmin,
         removeSectionAdmin,
+        getStudentByCi,
+        saveStudent,
+        getStudentEnrollments,
+        enrollStudentSubject,
+        unenrollStudentSubject,
         getPin,
         savePin,
         checkPin,
