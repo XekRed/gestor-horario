@@ -294,6 +294,7 @@ const Admin = (() => {
         if (tabKey === 'activities') renderAdminActivities();
         if (tabKey === 'section')    renderSectionSettings();
         if (tabKey === 'system')     renderSystemConfig();
+        if (tabKey === 'staff')      renderStaffPanel();
     }
 
     function updateModeBadge() {
@@ -305,10 +306,12 @@ const Admin = (() => {
         const isSb = DB.isSupabase();
         const isUnlocked = DB.isAdminUnlocked();
         const user = DB.getAdminUser();
+        const isOwn = (typeof DB !== 'undefined' && DB.isOwner) ? DB.isOwner() : false;
 
         if (isSb) {
             badge.className = 'admin-badge-mode mode-supabase';
-            badge.textContent = isUnlocked ? `Supabase (Admin: ${user?.email || 'Activo'})` : 'Supabase Realtime (Lectura)';
+            const roleTag = isOwn ? 'Owner' : 'Admin';
+            badge.textContent = isUnlocked ? `Supabase (${roleTag}: ${user?.email || 'Activo'})` : 'Supabase Realtime (Lectura)';
             if (fabDot) fabDot.className = 'admin-fab-status online';
             if (fab) fab.title = isUnlocked ? `Panel Admin (Sesión Permanente: ${user?.email || 'Admin'})` : 'Iniciar Sesión Admin';
         } else {
@@ -318,10 +321,16 @@ const Admin = (() => {
             if (fab) fab.title = isUnlocked ? 'Panel Admin (Sesión Activa)' : 'Acceso de Administrador (PIN)';
         }
 
+        // Tab de Staff (Visible siempre para Owner o en modo local si está desbloqueado)
+        const staffTabBtn = document.getElementById('adminTabBtnStaff');
+        if (staffTabBtn) {
+            staffTabBtn.style.display = (isOwn || (!isSb && isUnlocked)) ? 'inline-block' : 'none';
+        }
+
         const headerText = document.getElementById('btnHeaderAdminText');
         const headerDot = document.getElementById('headerAdminModeDot');
         if (headerText) {
-            headerText.textContent = isUnlocked ? 'Admin (Activo)' : 'Admin';
+            headerText.textContent = isUnlocked ? (isOwn ? 'Owner (Activo)' : 'Admin (Activo)') : 'Admin';
         }
         if (headerDot) {
             headerDot.style.background = isUnlocked ? 'var(--green)' : (isSb ? 'var(--cyan)' : 'var(--orange)');
@@ -715,6 +724,92 @@ const Admin = (() => {
         setTimeout(() => window.location.reload(), 800);
     }
 
+    /* ══════════════════════════════════════════════════════════
+       TAB 5: EQUIPO & ADMINISTRADORES (OWNER)
+    ═══════════════════════════════════════════════════════════ */
+    async function renderStaffPanel() {
+        const container = document.getElementById('adminStaffList');
+        if (!container) return;
+
+        container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:0.8rem;">Cargando administradores...</div>';
+
+        try {
+            const assignments = await DB.getSectionAdmins();
+
+            let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+
+            // Fila de Owner
+            html += `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(0,240,255,0.06);border:1px solid rgba(0,240,255,0.25);border-radius:8px;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span class="mono" style="font-weight:700;color:var(--cyan);font-size:0.82rem;">danidmartinez321@gmail.com</span>
+                            <span class="grade-status-pill status-passed" style="font-size:0.65rem;padding:1px 6px;">OWNER (DUEÑO)</span>
+                        </div>
+                        <span style="font-size:0.7rem;color:var(--text-3);">Control total global sobre todas las secciones y usuarios</span>
+                    </div>
+                    <span class="mono" style="font-size:0.72rem;color:var(--text-2);">Acceso Global</span>
+                </div>
+            `;
+
+            const nonOwnerAssignments = assignments.filter(a => (a.email || '').toLowerCase() !== 'danidmartinez321@gmail.com');
+
+            if (nonOwnerAssignments.length === 0) {
+                html += '<p class="empty-msg" style="padding:12px;font-size:0.75rem;">No hay administradores de sección adicionales registrados. Usa el formulario de arriba.</p>';
+            } else {
+                nonOwnerAssignments.forEach(adm => {
+                    html += `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;">
+                        <div>
+                            <span class="mono" style="font-size:0.8rem;color:var(--text-1);">${adm.email}</span>
+                            <span style="display:block;font-size:0.68rem;color:var(--text-3);">Sección asignada: <b class="mono" style="color:var(--cyan);">${adm.section_code}</b> (RLS Estricto)</span>
+                        </div>
+                        <button class="btn-ghost btn-sm text-danger" style="padding:2px 8px;font-size:0.7rem;" onclick="Admin.deleteSectionAdmin('${adm.id}')">
+                            Remover
+                        </button>
+                    </div>`;
+                });
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+        } catch (err) {
+            container.innerHTML = `<p class="empty-msg" style="color:var(--red);">Error cargando equipo: ${err.message}</p>`;
+        }
+    }
+
+    async function addNewSectionAdmin() {
+        const emailInput = document.getElementById('inputNewAdminEmail');
+        const secInput = document.getElementById('inputNewAdminSection');
+        const email = emailInput?.value.trim().toLowerCase();
+        const sec = secInput?.value.trim().toUpperCase() || '08S-2623-D1';
+
+        if (!email || !email.includes('@')) {
+            Notify.toast('Ingresa un correo electrónico válido', 'warning', 2500);
+            return;
+        }
+
+        try {
+            await DB.addSectionAdmin(email, sec);
+            Notify.toast(`Permisos de administrador concedidos a [${email}] sobre sección [${sec}]`, 'success', 3500);
+            if (emailInput) emailInput.value = '';
+            renderStaffPanel();
+        } catch (e) {
+            Notify.toast(`Error asignando administrador: ${e.message}`, 'error', 4500);
+        }
+    }
+
+    async function deleteSectionAdmin(id) {
+        if (!confirm('¿Deseas revocar los permisos de administrador para este usuario?')) return;
+        try {
+            await DB.removeSectionAdmin(id);
+            Notify.toast('Permiso de administrador revocado', 'info', 2500);
+            renderStaffPanel();
+        } catch (e) {
+            Notify.toast(`Error revocando permiso: ${e.message}`, 'error', 3500);
+        }
+    }
+
     /* ── INICIALIZACIÓN ──────────────────────────────────────── */
     function init() {
         // Escuchar Enter en contraseña de Auth
@@ -777,7 +872,11 @@ const Admin = (() => {
         saveTelegramSettings,
         exportBackup,
         importBackup,
-        factoryReset
+        factoryReset,
+        // Tab 5 (Owner Staff)
+        renderStaffPanel,
+        addNewSectionAdmin,
+        deleteSectionAdmin
     };
 
 })();

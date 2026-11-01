@@ -18,10 +18,13 @@ const DB = (() => {
     };
 
     /* ── ESTADO INTERNO ──────────────────────────────────────── */
+    const OWNER_EMAIL  = 'danidmartinez321@gmail.com';
     let _mode          = 'local';    // 'local' | 'supabase'
     let _supabase      = null;       // cliente Supabase oficial
     let _adminUser     = null;       // usuario administrador autenticado
     let _adminUnlocked = false;      // estado de sesión del administrador
+    let _userRole      = null;       // 'owner' | 'admin' | null
+    let _adminSections = [];         // ['08S-2623-D1', ...]
     let _realtimeChan  = null;       // canal de suscripción realtime
     let _cbs           = {};         // col → [callbacks de reactividad]
     let _cache         = {};         // col → datos en memoria sincronizados
@@ -43,8 +46,8 @@ const DB = (() => {
         {
             id: 'cultura',
             name: 'CULTURA Y COMUNICACIÓN',
-            shortName: 'C&C',
-            code: 'C&C-08S',
+            shortName: 'CCOM',
+            code: 'CCOM-08S',
             room: 'YSSF-010',
             teacher: '',
             color: '#9b59b6',
@@ -86,8 +89,8 @@ const DB = (() => {
         {
             id: 'teoria',
             name: 'TEORÍA DE DECISIONES',
-            shortName: 'TD',
-            code: 'TD-08S',
+            shortName: 'TDEC',
+            code: 'TDEC-08S',
             room: 'YSSF-010',
             teacher: 'Prof. Ana Díaz',
             color: '#ff2e5f',
@@ -96,8 +99,8 @@ const DB = (() => {
         {
             id: 'defensa',
             name: 'DEFENSA INTEGRAL DE LA NACIÓN VIII',
-            shortName: 'DIN',
-            code: 'DIN-08S',
+            shortName: 'DIN8',
+            code: 'DIN8-08S',
             room: '',
             teacher: 'Cap. Rodríguez',
             color: '#00bfa5',
@@ -116,8 +119,8 @@ const DB = (() => {
         {
             id: 'marco',
             name: 'MARCO LEGAL PARA EL EJER. DE LA INGENIERÍA',
-            shortName: 'MLE',
-            code: 'MLE-08S',
+            shortName: 'MLEG',
+            code: 'MLEG-08S',
             room: 'YSSF-010',
             teacher: 'Abg. Rosa Flores',
             color: '#fd79a8',
@@ -290,14 +293,17 @@ const DB = (() => {
                 await _checkSession();
 
                 // Escuchar cambios de estado en Auth
-                _supabase.auth.onAuthStateChange((event, session) => {
+                _supabase.auth.onAuthStateChange(async (event, session) => {
                     if (session && session.user) {
                         _adminUser = session.user;
                         _adminUnlocked = true;
                         localStorage.setItem(LS.adminSession, JSON.stringify(session.user));
+                        await _fetchUserPermissions();
                     } else {
                         _adminUser = null;
                         _adminUnlocked = false;
+                        _userRole = null;
+                        _adminSections = [];
                         localStorage.removeItem(LS.adminSession);
                     }
                     _notifyAdminStateChange();
@@ -334,13 +340,53 @@ const DB = (() => {
                 _adminUser = data.session.user;
                 _adminUnlocked = true;
                 localStorage.setItem(LS.adminSession, JSON.stringify(data.session.user));
+                await _fetchUserPermissions();
             } else {
                 _adminUser = null;
                 _adminUnlocked = false;
+                _userRole = null;
+                _adminSections = [];
                 localStorage.removeItem(LS.adminSession);
             }
         } catch (e) {
             console.error('[DB] Error comprobando sesión:', e);
+        }
+    }
+
+    async function _fetchUserPermissions() {
+        if (!_adminUser) {
+            _userRole = _adminUnlocked ? 'admin' : null;
+            _adminSections = ['08S-2623-D1'];
+            return;
+        }
+        const email = (_adminUser.email || '').toLowerCase().trim();
+        if (email === OWNER_EMAIL.toLowerCase()) {
+            _userRole = 'owner';
+            _adminSections = ['*'];
+        } else {
+            _userRole = 'admin';
+        }
+
+        if (_supabase) {
+            try {
+                const { data: staff } = await _supabase
+                    .from('staff_users')
+                    .select('role')
+                    .eq('email', email)
+                    .maybeSingle();
+                if (staff && staff.role) {
+                    _userRole = staff.role;
+                }
+                const { data: secs } = await _supabase
+                    .from('section_admins')
+                    .select('section_code')
+                    .eq('email', email);
+                if (secs && secs.length > 0) {
+                    _adminSections = secs.map(s => s.section_code);
+                }
+            } catch (e) {
+                console.warn('[DB] Error cargando permisos de staff:', e);
+            }
         }
     }
 
@@ -667,6 +713,76 @@ const DB = (() => {
         return _adminUser;
     }
 
+    function isOwner() {
+        if (!isAdminUnlocked()) return false;
+        const email = (_adminUser?.email || '').toLowerCase().trim();
+        if (email === OWNER_EMAIL.toLowerCase()) return true;
+        return _userRole === 'owner';
+    }
+
+    function getUserRole() {
+        if (!isAdminUnlocked()) return null;
+        if (isOwner()) return 'owner';
+        return _userRole || 'admin';
+    }
+
+    function canManageSection(secCode) {
+        if (!isAdminUnlocked()) return false;
+        if (isOwner()) return true;
+        if (!_supabase || _mode === 'local') return true;
+        const code = secCode || getSettings().seccion || '08S-2623-D1';
+        return _adminSections.includes('*') || _adminSections.includes(code);
+    }
+
+    async function getStaffUsers() {
+        if (_supabase) {
+            try {
+                const { data, error } = await _supabase.from('staff_users').select('*').order('created_at', { ascending: false });
+                if (!error && data) return data;
+            } catch (e) {}
+        }
+        return [
+            { id: '1', email: OWNER_EMAIL, role: 'owner', created_at: new Date().toISOString() }
+        ];
+    }
+
+    async function getSectionAdmins() {
+        if (_supabase) {
+            try {
+                const { data, error } = await _supabase.from('section_admins').select('*').order('created_at', { ascending: false });
+                if (!error && data) return data;
+            } catch (e) {}
+        }
+        return [
+            { id: '1', email: OWNER_EMAIL, section_code: '08S-2623-D1', created_at: new Date().toISOString() }
+        ];
+    }
+
+    async function addSectionAdmin(email, sectionCode) {
+        const cleanEmail = email.toLowerCase().trim();
+        const cleanSec = sectionCode.trim();
+        if (_supabase) {
+            await _supabase.from('staff_users').upsert({ email: cleanEmail, role: 'admin' }, { onConflict: 'email' });
+            const { data, error } = await _supabase.from('section_admins').insert({
+                email: cleanEmail,
+                section_code: cleanSec
+            }).select();
+            if (error) throw error;
+            return data;
+        } else {
+            return [{ id: 'loc_' + Date.now(), email: cleanEmail, section_code: cleanSec }];
+        }
+    }
+
+    async function removeSectionAdmin(id) {
+        if (_supabase) {
+            const { error } = await _supabase.from('section_admins').delete().eq('id', id);
+            if (error) throw error;
+            return true;
+        }
+        return true;
+    }
+
     /* ── PIN DE EMERGENCIA (MODO LOCAL) ── */
     function getPin()      { return localStorage.getItem(LS.pin) || '1234'; }
     function savePin(pin)  { localStorage.setItem(LS.pin, String(pin)); }
@@ -732,6 +848,13 @@ const DB = (() => {
         lockAdmin,
         isAdminUnlocked,
         getAdminUser,
+        isOwner,
+        getUserRole,
+        canManageSection,
+        getStaffUsers,
+        getSectionAdmins,
+        addSectionAdmin,
+        removeSectionAdmin,
         getPin,
         savePin,
         checkPin,

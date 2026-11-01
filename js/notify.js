@@ -255,7 +255,7 @@ const Notify = (() => {
             text += `*No hay clases programadas para hoy.*\n`;
         } else {
             todayClasses.forEach((c, idx) => {
-                text += `${idx + 1}. ⏰ *${c.start} - ${c.end}*\n`;
+                text += `${idx + 1}. • *${c.start} - ${c.end}*\n`;
                 text += `   • *${c.name}*\n`;
                 if (c.room) text += `     Aula: ${c.room}\n`;
                 if (c.teacher) text += `     Docente: ${c.teacher}\n`;
@@ -317,7 +317,7 @@ const Notify = (() => {
                 daySlots.sort((a, b) => a.startBlock - b.startBlock);
                 text += `*── ${dia.toUpperCase()} ──*\n`;
                 daySlots.forEach(s => {
-                    text += `⏰ ${s.time} | *${s.subject}* ${s.room ? `(${s.room})` : ''}\n`;
+                    text += `• ${s.time} | *${s.subject}* ${s.room ? `(${s.room})` : ''}\n`;
                 });
                 text += `\n`;
             }

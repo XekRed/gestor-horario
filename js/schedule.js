@@ -49,8 +49,8 @@ const Schedule = (() => {
         {
             id: 'cultura',
             name: 'CULTURA Y COMUNICACIÓN',
-            shortName: 'C&C',
-            code: 'C&C-08S',
+            shortName: 'CCOM',
+            code: 'CCOM-08S',
             room: 'YSSF-010',
             teacher: '',
             color: '#9b59b6',
@@ -98,8 +98,8 @@ const Schedule = (() => {
         {
             id: 'teoria',
             name: 'TEORÍA DE DECISIONES',
-            shortName: 'TD',
-            code: 'TD-08S',
+            shortName: 'TDEC',
+            code: 'TDEC-08S',
             room: 'YSSF-010',
             teacher: 'Prof. Ana Díaz',
             color: '#ff2e5f',
@@ -110,8 +110,8 @@ const Schedule = (() => {
         {
             id: 'defensa',
             name: 'DEFENSA INTEGRAL DE LA NACIÓN VIII',
-            shortName: 'DIN',
-            code: 'DIN-08S',
+            shortName: 'DIN8',
+            code: 'DIN8-08S',
             room: null,
             teacher: 'Cap. Rodríguez',
             color: '#00bfa5',
@@ -134,8 +134,8 @@ const Schedule = (() => {
         {
             id: 'marco',
             name: 'MARCO LEGAL PARA EL EJER. DE LA INGENIERÍA',
-            shortName: 'MLE',
-            code: 'MLE-08S',
+            shortName: 'MLEG',
+            code: 'MLEG-08S',
             room: 'YSSF-010',
             teacher: 'Abg. Rosa Flores',
             color: '#fd79a8',

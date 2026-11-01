@@ -94,6 +94,37 @@ const Student = (() => {
         localStorage.setItem(LS.grades, JSON.stringify(store));
     }
 
+    let _isUnlockedThisSession = false;
+
+    function getGradeMode() {
+        return (typeof Prefs !== 'undefined' && Prefs.getGradeMode) ? Prefs.getGradeMode() : 'percentage';
+    }
+
+    function to20(val, mode) {
+        if (val === null || val === undefined || isNaN(val) || val === '') return null;
+        const num = parseFloat(val);
+        if (mode === 'percentage') return (num / 100) * 20;
+        if (mode === 'scale5') return num * 4;
+        return num; // scale20
+    }
+
+    function from20(val20, mode) {
+        if (val20 === null || val20 === undefined || isNaN(val20)) return '';
+        if (mode === 'percentage') return Math.round((val20 / 20) * 100);
+        if (mode === 'scale5') return (val20 / 4).toFixed(1);
+        return parseFloat(val20).toFixed(1);
+    }
+
+    function getModeConfig(mode) {
+        if (mode === 'percentage') {
+            return { max: 100, step: 1, tag: '%', placeholder: '0-100%', title: 'Nota en Porcentaje (0–100%)' };
+        }
+        if (mode === 'scale5') {
+            return { max: 5, step: 0.1, tag: '/ 5', placeholder: '0-5', title: 'Nota sobre 5 pts' };
+        }
+        return { max: 20, step: 0.1, tag: '/ 20', placeholder: '0-20', title: 'Nota sobre 20 pts' };
+    }
+
     function getActivityGrade(activityId) {
         const store = getGradesStore();
         return store.activities ? store.activities[activityId] : null;
@@ -103,11 +134,13 @@ const Student = (() => {
         const store = getGradesStore();
         if (!store.activities) store.activities = {};
 
+        const mode = getGradeMode();
         const num = parseFloat(grade);
         if (isNaN(num) || grade === '' || grade === null) {
             delete store.activities[activityId];
         } else {
-            store.activities[activityId] = Math.max(0, Math.min(20, parseFloat(num.toFixed(2))));
+            const base20 = to20(num, mode);
+            store.activities[activityId] = Math.max(0, Math.min(20, parseFloat(base20.toFixed(2))));
         }
 
         saveGradesStore(store);
@@ -125,11 +158,13 @@ const Student = (() => {
         if (!store.customCortes) store.customCortes = {};
         if (!store.customCortes[subjectId]) store.customCortes[subjectId] = {};
 
+        const mode = getGradeMode();
         const num = parseFloat(grade);
         if (isNaN(num) || grade === '' || grade === null) {
             delete store.customCortes[subjectId][corteNum];
         } else {
-            store.customCortes[subjectId][corteNum] = Math.max(0, Math.min(20, parseFloat(num.toFixed(2))));
+            const base20 = to20(num, mode);
+            store.customCortes[subjectId][corteNum] = Math.max(0, Math.min(20, parseFloat(base20.toFixed(2))));
         }
 
         saveGradesStore(store);
@@ -299,7 +334,16 @@ const Student = (() => {
 
         const generalAverage = countGraded > 0 ? (sumAccum / countGraded).toFixed(1) : '—';
 
+        const isSecActive = (typeof Prefs !== 'undefined' && Prefs.isSecurityEnabled && Prefs.isSecurityEnabled());
+        const secLockBtn = (isSecActive && _isUnlockedThisSession)
+            ? `<button class="btn-ghost btn-sm" onclick="Student.lockGrades()" style="padding:2px 8px;font-size:0.68rem;color:var(--text-2);border-color:rgba(255,255,255,0.15);cursor:pointer;" title="Bloquear Notas con PIN">Bloquear Perfil</button>`
+            : '';
+
         container.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <span class="mono" style="font-size:0.75rem;color:var(--text-3);">RESUMEN ACADÉMICO</span>
+                ${secLockBtn}
+            </div>
             <div class="student-summary-grid">
                 <div class="summary-stat-box">
                     <span class="summary-stat-label">Promedio Actual Evaluado</span>
@@ -329,15 +373,41 @@ const Student = (() => {
         const grid = document.getElementById('gradesGrid');
         if (!grid) return;
 
+        // Comprobar bloqueo opcional por PIN de perfil
+        if (typeof Prefs !== 'undefined' && Prefs.isSecurityEnabled && Prefs.isSecurityEnabled() && !_isUnlockedThisSession) {
+            const ci = Prefs.getStudentCi() || 'Estudiante';
+            grid.innerHTML = `
+                <div class="grades-lock-card" style="text-align:center;padding:44px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;max-width:440px;margin:24px auto;">
+                    <div style="width:48px;height:48px;border-radius:50%;background:rgba(0,240,255,0.08);border:1px solid rgba(0,240,255,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto;color:var(--cyan);">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                    <h3 style="font-size:1.05rem;color:var(--text-1);margin-bottom:6px;">Perfil Protegido por PIN</h3>
+                    <p style="font-size:0.78rem;color:var(--text-2);line-height:1.4;margin:0 auto 18px auto;">
+                        Cédula: <b class="mono" style="color:var(--cyan);">${ci}</b><br>
+                        Ingresa tu PIN de 4 dígitos para acceder a tus calificaciones personales.
+                    </p>
+                    <div style="display:flex;gap:8px;justify-content:center;max-width:240px;margin:0 auto;">
+                        <input type="password" maxlength="4" id="inputGradesUnlockPin" class="form-input mono" placeholder="••••" style="text-align:center;font-size:1.15rem;letter-spacing:5px;" inputmode="numeric" onkeydown="if(event.key==='Enter') Student.unlockWithPin()">
+                        <button class="btn-primary btn-sm" onclick="Student.unlockWithPin()" style="white-space:nowrap;">Acceder</button>
+                    </div>
+                    <div id="gradesUnlockError" style="display:none;color:var(--red);font-size:0.74rem;margin-top:10px;">PIN incorrecto. Intenta de nuevo.</div>
+                </div>
+            `;
+            return;
+        }
+
         const subjects = typeof Schedule !== 'undefined' ? Schedule.getSubjects() : [];
         if (subjects.length === 0) {
             grid.innerHTML = '<p class="empty-msg" style="text-align:center;padding:40px;">No hay materias registradas en el horario.</p>';
             return;
         }
 
+        const mode = getGradeMode();
+        const cfg  = getModeConfig(mode);
+
         const STATUS_BADGES = {
             passed:      '<span class="grade-status-pill status-passed">Aprobada</span>',
-            in_progress: '<span class="grade-status-pill status-progress">En Curso ⏱️</span>',
+            in_progress: '<span class="grade-status-pill status-progress">En Curso [ACTIVO]</span>',
             at_risk:     '<span class="grade-status-pill status-risk">En Riesgo</span>',
             failed:      '<span class="grade-status-pill status-failed">Reprobada</span>',
         };
@@ -365,19 +435,22 @@ const Student = (() => {
                 if (corteActs.length > 0) {
                     // Muestra cada actividad del corte
                     const actsList = corteActs.map(act => {
-                        const gradeVal = getActivityGrade(act.id) ?? '';
+                        const gradeVal = getActivityGrade(act.id);
+                        const displayVal = (gradeVal !== null && gradeVal !== undefined && gradeVal !== '')
+                            ? from20(parseFloat(gradeVal), mode)
+                            : '';
                         return `
                         <div class="grade-entry-row">
                             <div style="flex:1;min-width:0;">
                                 <div class="grade-act-name">${act.title}</div>
-                                <div class="grade-act-sub mono">⭐ ${act.weight || 0}% de la materia</div>
+                                <div class="grade-act-sub mono">[POND: ${act.weight || 0}%]</div>
                             </div>
                             <div class="grade-input-wrap">
-                                <input type="number" step="0.1" min="0" max="20" class="grade-num-input mono"
-                                    value="${gradeVal}" placeholder="—"
+                                <input type="number" step="${cfg.step}" min="0" max="${cfg.max}" class="grade-num-input mono"
+                                    value="${displayVal}" placeholder="${cfg.placeholder}"
                                     onchange="Student.setActivityGrade('${act.id}', this.value)"
-                                    title="Nota sobre 20 pts">
-                                <span class="grade-scale-tag">/ 20</span>
+                                    title="${cfg.title}">
+                                <span class="grade-scale-tag">${cfg.tag}</span>
                             </div>
                         </div>`;
                     }).join('');
@@ -391,7 +464,10 @@ const Student = (() => {
                     </div>`;
                 } else {
                     // Sin actividades específicas del corte: input directo por corte (25%)
-                    const customGrade = getCustomCorteGrade(s.id, corteNum) ?? '';
+                    const customGrade = getCustomCorteGrade(s.id, corteNum);
+                    const displayCustom = (customGrade !== null && customGrade !== undefined && customGrade !== '')
+                        ? from20(parseFloat(customGrade), mode)
+                        : '';
                     return `
                     <div class="corte-block">
                         <div class="grade-entry-row">
@@ -400,11 +476,11 @@ const Student = (() => {
                                 <div class="grade-act-sub mono">25% (Estimado)</div>
                             </div>
                             <div class="grade-input-wrap">
-                                <input type="number" step="0.1" min="0" max="20" class="grade-num-input mono"
-                                    value="${customGrade}" placeholder="—"
+                                <input type="number" step="${cfg.step}" min="0" max="${cfg.max}" class="grade-num-input mono"
+                                    value="${displayCustom}" placeholder="${cfg.placeholder}"
                                     onchange="Student.setCustomCorteGrade('${s.id}', ${corteNum}, this.value)"
-                                    title="Nota sobre 20 pts">
-                                <span class="grade-scale-tag">/ 20</span>
+                                    title="${cfg.title}">
+                                <span class="grade-scale-tag">${cfg.tag}</span>
                             </div>
                         </div>
                     </div>`;
@@ -450,6 +526,25 @@ const Student = (() => {
         grid.innerHTML = html;
     }
 
+    function unlockWithPin() {
+        const pinInput = document.getElementById('inputGradesUnlockPin');
+        const pin = pinInput ? pinInput.value.trim() : '';
+        if (typeof Prefs !== 'undefined' && Prefs.checkStudentPin && Prefs.checkStudentPin(pin)) {
+            _isUnlockedThisSession = true;
+            renderGradesTab();
+            if (typeof Notify !== 'undefined') Notify.toast('Perfil de notas desbloqueado', 'success', 2000);
+        } else {
+            const err = document.getElementById('gradesUnlockError');
+            if (err) err.style.display = 'block';
+        }
+    }
+
+    function lockGrades() {
+        _isUnlockedThisSession = false;
+        renderGradesTab();
+        if (typeof Notify !== 'undefined') Notify.toast('Perfil de notas bloqueado', 'info', 2000);
+    }
+
     /* ══════════════════════════════════════════════════════════
        INICIALIZACIÓN
     ═══════════════════════════════════════════════════════════ */
@@ -474,7 +569,10 @@ const Student = (() => {
         importStudentDataFromFile,
         renderGradesTab,
         renderStudentSummary,
-        renderGradesGrid
+        renderGradesGrid,
+        unlockWithPin,
+        lockGrades,
+        getGradeMode
     };
 
 })();

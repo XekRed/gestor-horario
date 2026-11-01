@@ -69,11 +69,15 @@ const Prefs = (() => {
 
     /* ── CONFIGURACIÓN POR DEFECTO ───────────────────────────── */
     const DEFAULTS = {
-        theme:      'dark_bcv',   // 'dark_bcv' | 'oled' | 'light_hc'
-        accent:     'cyan',       // 'cyan' | 'green' | 'orange' | 'purple' | 'red'
-        density:    'standard',   // 'standard' | 'compact'
-        defaultTab: 'dashboard',  // 'dashboard' | 'schedule' | 'calendar' | 'grades'
-        subjectColors: {}         // { [subjectId]: '#hexcolor' }
+        theme:           'dark_bcv',   // 'dark_bcv' | 'oled' | 'light_hc'
+        accent:          'cyan',       // 'cyan' | 'green' | 'orange' | 'purple' | 'red'
+        density:         'standard',   // 'standard' | 'compact'
+        defaultTab:      'dashboard',  // 'dashboard' | 'schedule' | 'calendar' | 'grades'
+        gradeMode:       'percentage', // 'percentage' | 'scale20' | 'scale5'
+        securityEnabled: false,        // boolean
+        studentCi:       '',           // ej. 'V-28123456'
+        studentPin:      '',           // 4 dígitos numéricos
+        subjectColors:   {}            // { [subjectId]: '#hexcolor' }
     };
 
     const ACCENT_COLORS = {
@@ -190,6 +194,34 @@ const Prefs = (() => {
         const tabSel = document.getElementById('prefDefaultTab');
         if (tabSel) tabSel.value = p.defaultTab || 'dashboard';
 
+        // Grade Mode selector
+        const gradeSel = document.getElementById('prefGradeMode');
+        if (gradeSel) gradeSel.value = p.gradeMode || 'percentage';
+
+        // Security Profile (Optional)
+        const secToggle = document.getElementById('prefSecurityToggle');
+        const secFields = document.getElementById('prefSecurityFields');
+        const secStatus = document.getElementById('prefSecurityStatusText');
+        const secCi = document.getElementById('prefStudentCi');
+        const secPin = document.getElementById('prefStudentPin');
+
+        if (secToggle) {
+            secToggle.checked = Boolean(p.securityEnabled);
+            if (secStatus) {
+                secStatus.textContent = p.securityEnabled
+                    ? (p.studentPin ? `Activado (Cédula: ${p.studentCi || 'Protegida'})` : 'Configuración Incompleta')
+                    : 'Desactivado (Acceso Libre)';
+            }
+        }
+        if (secFields) {
+            secFields.style.display = p.securityEnabled ? 'flex' : 'none';
+        }
+        if (secCi) secCi.value = p.studentCi || '';
+        if (secPin) {
+            secPin.value = '';
+            secPin.placeholder = p.studentPin ? '•••• (PIN Configurado)' : 'PIN (4 dígitos)';
+        }
+
         // Subject visibility list & external subscriptions
         _renderSubjectVisibility(s);
     }
@@ -303,6 +335,65 @@ const Prefs = (() => {
             p.defaultTab = e.target.value;
             save(p);
             if (typeof Notify !== 'undefined') Notify.toast('Vista inicial guardada', 'info', 1500);
+        });
+
+        // Grade Mode select
+        document.getElementById('prefGradeMode')?.addEventListener('change', (e) => {
+            setGradeMode(e.target.value);
+            if (typeof Notify !== 'undefined') {
+                const names = { percentage: 'Porcentaje % (0–100%)', scale20: 'Escala 0–20 Puntos', scale5: 'Escala 0–5 Puntos' };
+                Notify.toast(`Modo de notas: ${names[e.target.value] || e.target.value}`, 'success', 2000);
+            }
+        });
+
+        // Security Profile Toggle & Save
+        const secToggle = document.getElementById('prefSecurityToggle');
+        const secFields = document.getElementById('prefSecurityFields');
+        const secStatus = document.getElementById('prefSecurityStatusText');
+
+        if (secToggle) {
+            secToggle.addEventListener('change', () => {
+                if (secFields) secFields.style.display = secToggle.checked ? 'flex' : 'none';
+                if (!secToggle.checked) {
+                    // Desactivar seguridad
+                    const p = load();
+                    p.securityEnabled = false;
+                    save(p);
+                    if (secStatus) secStatus.textContent = 'Desactivado (Acceso Libre)';
+                    if (typeof Notify !== 'undefined') Notify.toast('Seguridad de perfil desactivada', 'info', 2000);
+                } else {
+                    if (secStatus) secStatus.textContent = 'Pendiente de guardar PIN';
+                }
+            });
+        }
+
+        document.getElementById('btnSaveSecurityProfile')?.addEventListener('click', () => {
+            const ci = document.getElementById('prefStudentCi')?.value.trim();
+            const pin = document.getElementById('prefStudentPin')?.value.trim();
+            const p = load();
+
+            if (!pin && !p.studentPin) {
+                if (typeof Notify !== 'undefined') Notify.toast('Ingresa un PIN numérico de 4 dígitos', 'warning', 2500);
+                return;
+            }
+
+            if (pin && (pin.length !== 4 || isNaN(Number(pin)))) {
+                if (typeof Notify !== 'undefined') Notify.toast('El PIN debe tener exactamente 4 números', 'warning', 2500);
+                return;
+            }
+
+            p.securityEnabled = true;
+            if (ci) p.studentCi = ci;
+            if (pin) p.studentPin = pin;
+            save(p);
+
+            if (secStatus) secStatus.textContent = `Activado (Cédula: ${p.studentCi || 'Protegida'})`;
+            const secPinInput = document.getElementById('prefStudentPin');
+            if (secPinInput) {
+                secPinInput.value = '';
+                secPinInput.placeholder = '•••• (PIN Configurado)';
+            }
+            if (typeof Notify !== 'undefined') Notify.toast('Seguridad de perfil y PIN guardados con éxito', 'success', 2500);
         });
 
         // Subscribe by code button & enter key
@@ -426,6 +517,34 @@ const Prefs = (() => {
         return load().defaultTab || 'dashboard';
     }
 
+    function getGradeMode() {
+        return load().gradeMode || 'percentage';
+    }
+
+    function setGradeMode(mode) {
+        const p = load();
+        p.gradeMode = mode;
+        save(p);
+        if (typeof Student !== 'undefined' && Student.renderGradesTab) {
+            Student.renderGradesTab();
+        }
+    }
+
+    function isSecurityEnabled() {
+        const p = load();
+        return Boolean(p.securityEnabled && p.studentPin);
+    }
+
+    function getStudentCi() {
+        return load().studentCi || '';
+    }
+
+    function checkStudentPin(pin) {
+        const p = load();
+        if (!p.studentPin) return true;
+        return String(pin).trim() === String(p.studentPin).trim();
+    }
+
     function getExternalCatalog() {
         return EXTERNAL_CATALOG;
     }
@@ -443,6 +562,11 @@ const Prefs = (() => {
         subscribeByCode,
         unsubscribe,
         getDefaultTab,
+        getGradeMode,
+        setGradeMode,
+        isSecurityEnabled,
+        getStudentCi,
+        checkStudentPin,
         getExternalCatalog
     };
 
