@@ -584,10 +584,18 @@ const Student = (() => {
         const subjects = typeof Schedule !== 'undefined' ? Schedule.getSubjects() : [];
         if (subjects.length === 0) {
             grid.innerHTML = `
-                <div class="empty-schedule-alert" style="margin:20px 0;">
-                    <div class="esa-title">No hay materias inscritas en tu horario</div>
-                    <div class="esa-desc">Inscribe tus asignaturas para registrar tus notas por corte y hacer seguimiento a tu rendimiento académico.</div>
-                    <button class="btn-primary btn-sm" onclick="Student.openEnrollModal()" style="margin-top:6px;">Inscribir Materias</button>
+                <div class="empty-schedule-alert" style="margin:24px auto;max-width:540px;text-align:center;padding:32px 24px;">
+                    <div style="width:48px;height:48px;border-radius:50%;background:rgba(0,240,255,0.08);border:1px solid rgba(0,240,255,0.25);display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto;color:var(--cyan);">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="22" height="22"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    </div>
+                    <div class="esa-title" style="font-size:1.05rem;color:var(--text-1);margin-bottom:6px;">Sin Materias Inscritas</div>
+                    <div class="esa-desc" style="font-size:0.8rem;color:var(--text-2);line-height:1.45;margin-bottom:16px;">
+                        Tu registro académico inicia vacío (0 materias). Inscribe tus asignaturas para ver tus horarios, registrar tus notas por corte y hacer seguimiento a tu rendimiento.
+                    </div>
+                    <button class="btn-primary btn-sm" onclick="Student.openEnrollModal()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;font-size:0.82rem;margin:0 auto;cursor:pointer;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Inscribir Materias
+                    </button>
                 </div>
             `;
             return;
@@ -1012,6 +1020,8 @@ const Student = (() => {
         const obScreen = document.getElementById('onboardingContainer');
 
         if (!hasProf && !isAdmin) {
+            // Usuario no identificado: asegurar horario en blanco (0 materias inscritas por defecto)
+            localStorage.setItem(LS.enrolled, JSON.stringify([]));
             // Bloqueo total del resto de la app
             document.body.classList.add('app-locked');
             if (obScreen) {
@@ -1304,6 +1314,11 @@ const Student = (() => {
         };
 
         saveProfile(profileData);
+
+        // Estudiante nuevo: garantizar 0 materias inscritas al iniciar
+        if (!existingStudent) {
+            localStorage.setItem(LS.enrolled, JSON.stringify([]));
+        }
 
         // Guardar en Supabase en segundo plano
         if (typeof DB !== 'undefined' && DB.saveStudent) {
@@ -2101,6 +2116,9 @@ const Student = (() => {
        INICIALIZACIÓN
     ═══════════════════════════════════════════════════════════ */
     function init() {
+        if (!hasActiveProfile()) {
+            localStorage.setItem(LS.enrolled, JSON.stringify([]));
+        }
         updateHeaderProfile();
         renderGradesTab();
         checkOnboardingLock();

@@ -34,16 +34,6 @@ const DB = (() => {
     ═══════════════════════════════════════════════════════════ */
     const SEED_SUBJECTS = [
         {
-            id: 'civico',
-            name: 'CÍVICO',
-            shortName: 'CIV',
-            code: 'CIV-08S',
-            room: '',
-            teacher: '',
-            color: '#00f0ff',
-            slots: [{ day: 0, startBlock: 1, span: 1 }]
-        },
-        {
             id: 'cultura',
             name: 'CULTURA Y COMUNICACIÓN',
             shortName: 'CCOM',

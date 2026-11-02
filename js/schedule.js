@@ -35,18 +35,6 @@ const Schedule = (() => {
     /* ── MATERIAS SEMILLA CON CÓDIGOS OFICIALES ───────────────── */
     const SEED_SUBJECTS = [
         {
-            id: 'civico',
-            name: 'CÍVICO',
-            shortName: 'CIV',
-            code: 'CIV-08S',
-            room: null,
-            teacher: '',
-            color: '#00f0ff',
-            slots: [
-                { day: 0, startBlock: 1, span: 1 }  // Lun 7:45-8:30
-            ]
-        },
-        {
             id: 'cultura',
             name: 'CULTURA Y COMUNICACIÓN',
             shortName: 'CCOM',

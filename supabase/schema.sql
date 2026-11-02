@@ -405,18 +405,6 @@ on conflict (email) do nothing;
 insert into public.subjects (id, subject_code, section_code, name, short_name, classroom, professor, professor_id, color, schedule_blocks)
 values
 (
-    'civico',
-    'CIV-08S',
-    '08S-2623-D1',
-    'CÍVICO',
-    'CIV',
-    null,
-    '',
-    null,
-    '#00f0ff',
-    '[{"day": 0, "startBlock": 1, "span": 1}]'::jsonb
-),
-(
     'cultura',
     'CCOM-08S',
     '08S-2623-D1',
