@@ -224,11 +224,25 @@ export async function runMorningDigest(env = process.env) {
     console.log(`[Digest] Fecha objetivo HOY: ${todayStr} | MAÑANA: ${tomorrowStr}`);
 
     // Consultar datos de Supabase
-    const [sections, subjects, activities] = await Promise.all([
-        fetchSupabase('sections?select=*&limit=1', supabaseUrl, supabaseKey),
-        fetchSupabase('subjects?select=*', supabaseUrl, supabaseKey),
-        fetchSupabase('activities?select=*&order=due_date.asc', supabaseUrl, supabaseKey)
-    ]);
+    let sections = [], subjects = [], activities = [];
+    try {
+        [sections, subjects, activities] = await Promise.all([
+            fetchSupabase('sections?select=*&limit=1', supabaseUrl, supabaseKey),
+            fetchSupabase('subjects?select=*', supabaseUrl, supabaseKey),
+            fetchSupabase('activities?select=*&order=due_date.asc', supabaseUrl, supabaseKey)
+        ]);
+    } catch (err) {
+        console.warn('[Digest] Error consultando Supabase:', err.message);
+        if (!telegramToken || !telegramChatId) {
+            console.log('[Digest] TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados. Omitiendo envío.');
+            return {
+                success: false,
+                warning: 'Supabase no accesible o variables de Telegram no configuradas',
+                error: err.message
+            };
+        }
+        throw err;
+    }
 
     const section = sections[0] || null;
 

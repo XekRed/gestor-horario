@@ -321,8 +321,9 @@ const Activities = (() => {
             return;
         }
 
-        const subjId = document.getElementById('actSubject').value;
-        const inputWeight = parseFloat(document.getElementById('actWeight').value) || 0;
+        const subjId = document.getElementById('actSubject')?.value;
+        const corte = document.getElementById('actCorte')?.value || '1';
+        const inputWeight = parseFloat(document.getElementById('actWeight')?.value) || 0;
         if (!subjId) { notice.innerHTML = ''; return; }
 
         const allActs = (typeof DB !== 'undefined' ? DB.get('activities') : []) || [];
@@ -330,17 +331,22 @@ const Activities = (() => {
             .filter(a => a.subjectId === subjId && a.id !== _editingActivityId)
             .reduce((sum, a) => sum + (parseFloat(a.weight) || 0), 0);
 
-        const newTotal = existingSubjectWeights + inputWeight;
+        const existingCorteWeights = allActs
+            .filter(a => a.subjectId === subjId && String(a.corte) === String(corte) && a.id !== _editingActivityId)
+            .reduce((sum, a) => sum + (parseFloat(a.weight) || 0), 0);
 
-        if (newTotal > 100) {
-            notice.className = 'weight-notice-text danger';
-            notice.innerHTML = `[ALERTA] <b>Ponderación acumulada: ${newTotal}%</b> (¡Excede el 100% total de la asignatura!)`;
+        const newTotal = existingSubjectWeights + inputWeight;
+        const newCorteTotal = existingCorteWeights + inputWeight;
+
+        if (newTotal > 100 || newCorteTotal > 25) {
+            notice.className = 'weight-notice-text extra';
+            notice.innerHTML = `[ACTIVIDAD EXTRA] Corte ${corte}: <b>${newCorteTotal}%</b> (Nominal: 25%) · Total Asignatura: <b>${newTotal}%</b>. Las actividades extra están permitidas; el acumulado final por estudiante se limitará al 100%.`;
         } else if (newTotal === 100) {
             notice.className = 'weight-notice-text safe';
-            notice.innerHTML = `[COMPLETA] <b>Ponderación acumulada: 100%</b> (Asignatura completa)`;
+            notice.innerHTML = `[COMPLETA] Corte ${corte}: <b>${newCorteTotal}% / 25%</b> · Total Asignatura: <b>100%</b> (Asignatura completa)`;
         } else {
             notice.className = 'weight-notice-text warning';
-            notice.innerHTML = `Ponderación acumulada: <b>${newTotal}% / 100%</b> (Queda disponible ${100 - newTotal}%)`;
+            notice.innerHTML = `Corte ${corte}: <b>${newCorteTotal}% / 25%</b> · Total Asignatura: <b>${newTotal}% / 100%</b> (Disponible: ${Math.max(0, 100 - newTotal)}%)`;
         }
     }
 

@@ -102,29 +102,82 @@ const Student = (() => {
         return (typeof Prefs !== 'undefined' && Prefs.getGradeMode) ? Prefs.getGradeMode() : 'percentage';
     }
 
-    function to20(val, mode) {
-        if (val === null || val === undefined || isNaN(val) || val === '') return null;
-        const num = parseFloat(val);
-        if (mode === 'percentage') return (num / 100) * 20;
-        if (mode === 'scale5') return num * 4;
-        return num; // scale20
-    }
-
-    function from20(val20, mode) {
-        if (val20 === null || val20 === undefined || isNaN(val20)) return '';
-        if (mode === 'percentage') return Math.round((val20 / 20) * 100);
-        if (mode === 'scale5') return (val20 / 4).toFixed(1);
-        return parseFloat(val20).toFixed(1);
+    function switchScale(newScale) {
+        if (typeof Prefs !== 'undefined' && Prefs.setGradeMode) {
+            Prefs.setGradeMode(newScale);
+        }
+        renderGradesTab();
+        if (typeof App !== 'undefined') App.renderDashboard();
+        if (typeof Notify !== 'undefined') {
+            const names = {
+                percentage: 'Porcentaje % (0–100%)',
+                scale20: 'Escala 20 Puntos (Aprobación: 9.60 pts)',
+                scale5: 'Escala 5 Puntos (Aprobación: 2.40 pts)'
+            };
+            Notify.toast(`Escala de notas: ${names[newScale] || newScale}`, 'info', 2000);
+        }
     }
 
     function getModeConfig(mode) {
-        if (mode === 'percentage') {
-            return { max: 100, step: 1, tag: '%', placeholder: '0-100%', title: 'Nota en Porcentaje (0–100%)' };
+        if (mode === 'scale20') {
+            return {
+                max: 20,
+                step: 0.1,
+                tag: '/ 20',
+                placeholder: '0-20 pts',
+                scaleMax: 20,
+                passingDisplay: '9.60 pts',
+                label: '20 Puntos',
+                title: 'Nota en escala de 0 a 20 puntos'
+            };
         }
         if (mode === 'scale5') {
-            return { max: 5, step: 0.1, tag: '/ 5', placeholder: '0-5', title: 'Nota sobre 5 pts' };
+            return {
+                max: 5,
+                step: 0.05,
+                tag: '/ 5',
+                placeholder: '0-5 pts',
+                scaleMax: 5,
+                passingDisplay: '2.40 pts',
+                label: '5 Puntos',
+                title: 'Nota en escala de 0 a 5 puntos'
+            };
         }
-        return { max: 20, step: 0.1, tag: '/ 20', placeholder: '0-20', title: 'Nota sobre 20 pts' };
+        return {
+            max: 100,
+            step: 1,
+            tag: '%',
+            placeholder: '0-100%',
+            scaleMax: 100,
+            passingDisplay: '48.0%',
+            label: 'Porcentaje %',
+            title: 'Nota en porcentaje (0–100%)'
+        };
+    }
+
+    // Convierte el valor ingresado por el usuario en el modo actual a porcentaje nativo (0-100%)
+    function inputToPct(val, mode) {
+        if (val === null || val === undefined || isNaN(val) || val === '') return null;
+        const num = parseFloat(val);
+        if (mode === 'scale20') return (num / 20) * 100;
+        if (mode === 'scale5') return (num / 5) * 100;
+        return Math.max(0, num);
+    }
+
+    // Convierte un porcentaje nativo (0-100%) al valor de visualización en el modo actual
+    function pctToDisplay(pct, mode, decimals = null) {
+        if (pct === null || pct === undefined || isNaN(pct)) return '';
+        const num = parseFloat(pct);
+        if (mode === 'scale20') {
+            const dec = decimals !== null ? decimals : 2;
+            return (num * 0.20).toFixed(dec);
+        }
+        if (mode === 'scale5') {
+            const dec = decimals !== null ? decimals : 2;
+            return (num * 0.05).toFixed(dec);
+        }
+        const dec = decimals !== null ? decimals : 1;
+        return num.toFixed(dec);
     }
 
     function getActivityGrade(activityId) {
@@ -137,12 +190,11 @@ const Student = (() => {
         if (!store.activities) store.activities = {};
 
         const mode = getGradeMode();
-        const num = parseFloat(grade);
-        if (isNaN(num) || grade === '' || grade === null) {
+        const pct = inputToPct(grade, mode);
+        if (pct === null) {
             delete store.activities[activityId];
         } else {
-            const base20 = to20(num, mode);
-            store.activities[activityId] = Math.max(0, Math.min(20, parseFloat(base20.toFixed(2))));
+            store.activities[activityId] = Math.max(0, Math.min(100, parseFloat(pct.toFixed(2))));
         }
 
         saveGradesStore(store);
@@ -161,12 +213,11 @@ const Student = (() => {
         if (!store.customCortes[subjectId]) store.customCortes[subjectId] = {};
 
         const mode = getGradeMode();
-        const num = parseFloat(grade);
-        if (isNaN(num) || grade === '' || grade === null) {
+        const pct = inputToPct(grade, mode);
+        if (pct === null) {
             delete store.customCortes[subjectId][corteNum];
         } else {
-            const base20 = to20(num, mode);
-            store.customCortes[subjectId][corteNum] = Math.max(0, Math.min(20, parseFloat(base20.toFixed(2))));
+            store.customCortes[subjectId][corteNum] = Math.max(0, Math.min(100, parseFloat(pct.toFixed(2))));
         }
 
         saveGradesStore(store);
@@ -174,73 +225,95 @@ const Student = (() => {
         if (typeof App !== 'undefined') App.renderDashboard();
     }
 
-    /* ── CÁLCULO PONDERADO POR MATERIA ── */
+    /* ══════════════════════════════════════════════════════════
+       CÁLCULO PONDERADO: 4 CORTES DE 25% · APROBACIÓN AL 48%
+    ═══════════════════════════════════════════════════════════ */
     function calculateSubjectMetrics(subjectId) {
         const allActs = (typeof DB !== 'undefined' ? DB.get('activities') : []) || [];
         const subjActs = allActs.filter(a => a.subjectId === subjectId);
-        const gradesStore = getGradesStore();
 
-        let evaluatedWeight = 0;
-        let pointsAccumulated = 0;
+        // 4 Cortes de 25%
+        const corteBreakdown = {};
+        const corteScores = { 1: null, 2: null, 3: null, 4: null };
         let totalAssignedWeight = 0;
+        let evaluatedWeight = 0;
+        let rawAcumulado = 0;
 
-        // Caso 1: Asignatura con actividades programadas por el Admin
-        if (subjActs.length > 0) {
-            subjActs.forEach(a => {
-                const w = parseFloat(a.weight) || 0;
-                totalAssignedWeight += w;
-                const g = gradesStore.activities ? gradesStore.activities[a.id] : null;
+        [1, 2, 3, 4].forEach(corteNum => {
+            const actsInCorte = subjActs.filter(a => String(a.corte) === String(corteNum));
+            let plannedWeight = 0;
+            let evalWeight = 0;
+            let earnedPct = 0;
 
-                if (g !== null && g !== undefined && !isNaN(g)) {
-                    evaluatedWeight += w;
-                    pointsAccumulated += (parseFloat(g) * (w / 100));
+            if (actsInCorte.length > 0) {
+                actsInCorte.forEach(a => {
+                    const w = parseFloat(a.weight) || 0;
+                    plannedWeight += w;
+                    const g = getActivityGrade(a.id);
+                    if (g !== null && g !== undefined && !isNaN(g)) {
+                        evalWeight += w;
+                        earnedPct += (parseFloat(g) / 100) * w;
+                    }
+                });
+            } else {
+                // Sin actividades del admin: corte manual nominal de 25%
+                plannedWeight = 25;
+                const customG = getCustomCorteGrade(subjectId, corteNum);
+                if (customG !== null && customG !== undefined && !isNaN(customG)) {
+                    evalWeight = 25;
+                    earnedPct = (parseFloat(customG) / 100) * 25;
                 }
-            });
-        } else {
-            // Caso 2: Sin actividades específicas del admin, usa cortes manuales (25% c/u)
-            const custom = (gradesStore.customCortes && gradesStore.customCortes[subjectId]) || {};
-            [1, 2, 3, 4].forEach(c => {
-                totalAssignedWeight += 25;
-                const g = custom[c];
-                if (g !== null && g !== undefined && !isNaN(g)) {
-                    evaluatedWeight += 25;
-                    pointsAccumulated += (parseFloat(g) * 0.25);
-                }
-            });
-        }
+            }
 
+            totalAssignedWeight += plannedWeight;
+            evaluatedWeight += evalWeight;
+            rawAcumulado += earnedPct;
+
+            corteScores[corteNum] = evalWeight > 0 ? parseFloat(earnedPct.toFixed(2)) : null;
+
+            corteBreakdown[corteNum] = {
+                plannedWeight,
+                evalWeight,
+                earnedPct: parseFloat(earnedPct.toFixed(2)),
+                acts: actsInCorte
+            };
+        });
+
+        // REGLA: Limitar acumulado máximo que puede obtener un estudiante a 100%
+        const totalAcumulado = Math.min(100, Math.max(0, parseFloat(rawAcumulado.toFixed(2))));
         const remainingWeight = Math.max(0, 100 - evaluatedWeight);
-        const passingThreshold = 9.5; // Redondea a 10 en la escala venezolana
-        const neededPoints = Math.max(0, passingThreshold - pointsAccumulated);
 
-        let pointsNeededAverage = null;
-        let status = 'in_progress'; // 'passed' | 'in_progress' | 'at_risk' | 'failed'
+        // REGLA: Aprobación al 48%
+        const passingThreshold = 48.0;
+        let status = 'in_progress';
+        let neededPct = 0;
 
-        if (pointsAccumulated >= passingThreshold) {
+        if (totalAcumulado >= passingThreshold) {
             status = 'passed';
-            pointsNeededAverage = 0;
-        } else if (remainingWeight <= 0) {
+            neededPct = 0;
+        } else if (totalAcumulado + remainingWeight < passingThreshold) {
             status = 'failed';
+            neededPct = parseFloat((passingThreshold - totalAcumulado).toFixed(1));
         } else {
-            const req = (neededPoints / (remainingWeight / 100));
-            if (req > 20) {
-                status = 'failed'; // Imposible alcanzar 9.5 incluso con 20 en todo lo restante
-            } else if (req > 14) {
+            neededPct = parseFloat((passingThreshold - totalAcumulado).toFixed(1));
+            // Si para aprobar necesita promediar más del 70% de lo restante
+            if (remainingWeight > 0 && (neededPct / remainingWeight) > 0.70) {
                 status = 'at_risk';
-                pointsNeededAverage = parseFloat(req.toFixed(1));
             } else {
                 status = 'in_progress';
-                pointsNeededAverage = parseFloat(req.toFixed(1));
             }
         }
 
         return {
-            pointsAccumulated: parseFloat(pointsAccumulated.toFixed(2)),
+            totalAcumulado,
             evaluatedWeight: Math.round(evaluatedWeight),
             remainingWeight: Math.round(remainingWeight),
-            neededPoints: parseFloat(neededPoints.toFixed(2)),
-            pointsNeededAverage,
+            totalAssignedWeight,
+            passingThreshold,
+            neededPct,
             status,
+            corteBreakdown,
+            corteScores,
             subjActs
         };
     }
@@ -316,6 +389,7 @@ const Student = (() => {
 
         const subjects = typeof Schedule !== 'undefined' ? Schedule.getSubjects() : [];
         const progress = getProgress();
+        const mode = getGradeMode();
 
         let sumAccum = 0;
         let countGraded = 0;
@@ -326,15 +400,30 @@ const Student = (() => {
         subjects.forEach(s => {
             const m = calculateSubjectMetrics(s.id);
             if (m.evaluatedWeight > 0) {
-                sumAccum += (m.pointsAccumulated * (100 / m.evaluatedWeight)); // Escalar a base 20 de lo evaluado
+                sumAccum += m.totalAcumulado;
                 countGraded++;
             }
             if (m.status === 'passed') passedCount++;
             else if (m.status === 'at_risk') atRiskCount++;
+            else if (m.status === 'failed') {}
             else inProgressCount++;
         });
 
-        const generalAverage = countGraded > 0 ? (sumAccum / countGraded).toFixed(1) : '—';
+        const generalAveragePct = countGraded > 0 ? (sumAccum / countGraded) : null;
+        let averageDisplay = '—';
+        let averageSub = '/ 100%';
+        if (generalAveragePct !== null) {
+            if (mode === 'scale20') {
+                averageDisplay = (generalAveragePct * 0.20).toFixed(2);
+                averageSub = '/ 20 pts';
+            } else if (mode === 'scale5') {
+                averageDisplay = (generalAveragePct * 0.05).toFixed(2);
+                averageSub = '/ 5 pts';
+            } else {
+                averageDisplay = `${generalAveragePct.toFixed(1)}%`;
+                averageSub = '/ 100%';
+            }
+        }
 
         const isSecActive = (typeof Prefs !== 'undefined' && Prefs.isSecurityEnabled && Prefs.isSecurityEnabled());
         const secLockBtn = (isSecActive && _isUnlockedThisSession)
@@ -343,17 +432,17 @@ const Student = (() => {
 
         container.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <span class="mono" style="font-size:0.75rem;color:var(--text-3);">RESUMEN ACADÉMICO</span>
+                <span class="mono" style="font-size:0.75rem;color:var(--text-3);">RESUMEN ACADÉMICO (4 CORTES DE 25% · APROBACIÓN CON 48%)</span>
                 ${secLockBtn}
             </div>
             <div class="student-summary-grid">
                 <div class="summary-stat-box">
-                    <span class="summary-stat-label">Promedio Actual Evaluado</span>
-                    <span class="summary-stat-val mono" style="color:var(--cyan);">${generalAverage} <small style="font-size:0.65rem;color:var(--text-3)">/ 20 pts</small></span>
+                    <span class="summary-stat-label">Promedio Acumulado Actual</span>
+                    <span class="summary-stat-val mono" style="color:var(--cyan);">${averageDisplay} <small style="font-size:0.65rem;color:var(--text-3)">${averageSub}</small></span>
                 </div>
                 <div class="summary-stat-box">
                     <span class="summary-stat-label">Materias Aprobadas</span>
-                    <span class="summary-stat-val mono" style="color:var(--green);">${passedCount} <small style="font-size:0.65rem;color:var(--text-3)">de ${subjects.length}</small></span>
+                    <span class="summary-stat-val mono" style="color:var(--green);">${passedCount} <small style="font-size:0.65rem;color:var(--text-3)">de ${subjects.length} (Mín. 48%)</small></span>
                 </div>
                 <div class="summary-stat-box">
                     <span class="summary-stat-label">En Riesgo Académico</span>
@@ -374,6 +463,12 @@ const Student = (() => {
     function renderGradesGrid() {
         const grid = document.getElementById('gradesGrid');
         if (!grid) return;
+
+        // Actualizar estado activo en los botones del switch de escala en la cabecera
+        const currentMode = getGradeMode();
+        document.querySelectorAll('#gradeScaleSwitchGroup .scale-switch-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.scale === currentMode);
+        });
 
         // Comprobar bloqueo opcional por PIN de perfil
         if (typeof Prefs !== 'undefined' && Prefs.isSecurityEnabled && Prefs.isSecurityEnabled() && !_isUnlockedThisSession) {
@@ -400,7 +495,13 @@ const Student = (() => {
 
         const subjects = typeof Schedule !== 'undefined' ? Schedule.getSubjects() : [];
         if (subjects.length === 0) {
-            grid.innerHTML = '<p class="empty-msg" style="text-align:center;padding:40px;">No hay materias registradas en el horario.</p>';
+            grid.innerHTML = `
+                <div class="empty-schedule-alert" style="margin:20px 0;">
+                    <div class="esa-title">No hay materias inscritas en tu horario</div>
+                    <div class="esa-desc">Inscribe tus asignaturas para registrar tus notas por corte y hacer seguimiento a tu rendimiento académico.</div>
+                    <button class="btn-primary btn-sm" onclick="Student.openEnrollModal()" style="margin-top:6px;">Inscribir Materias</button>
+                </div>
+            `;
             return;
         }
 
@@ -408,10 +509,10 @@ const Student = (() => {
         const cfg  = getModeConfig(mode);
 
         const STATUS_BADGES = {
-            passed:      '<span class="grade-status-pill status-passed">Aprobada</span>',
-            in_progress: '<span class="grade-status-pill status-progress">En Curso [ACTIVO]</span>',
-            at_risk:     '<span class="grade-status-pill status-risk">En Riesgo</span>',
-            failed:      '<span class="grade-status-pill status-failed">Reprobada</span>',
+            passed:      '<span class="grade-status-pill status-passed">[APROBADO]</span>',
+            in_progress: '<span class="grade-status-pill status-progress">[EN CURSO]</span>',
+            at_risk:     '<span class="grade-status-pill status-risk">[EN RIESGO]</span>',
+            failed:      '<span class="grade-status-pill status-failed">[REPROBADO]</span>',
         };
 
         let html = '';
@@ -421,25 +522,32 @@ const Student = (() => {
             const statusBadge = STATUS_BADGES[m.status] || STATUS_BADGES.in_progress;
 
             let projectionMsg = '';
+            const displayAcum = pctToDisplay(m.totalAcumulado, mode);
+            const displayAcumText = mode === 'percentage' ? `${displayAcum}%` : `${displayAcum} pts`;
+
             if (m.status === 'passed') {
-                projectionMsg = '<div class="projection-box safe"><b>[APROBADA]</b> Ya acumulaste los 9.5 puntos mínimos reglamentarios.</div>';
+                projectionMsg = `<div class="projection-box safe"><b>[APROBADO]</b> ¡Materia aprobada! Acumulaste <b>${displayAcumText}</b> (Mínimo aprobatorio reglamentario: <b>${cfg.passingDisplay}</b>).</div>`;
             } else if (m.status === 'failed') {
-                projectionMsg = '<div class="projection-box danger"><b>[ATENCIÓN]</b> Matemáticamente imposible alcanzar 9.5 en el porcentaje restante.</div>';
-            } else if (m.pointsNeededAverage !== null) {
-                const colorClass = m.status === 'at_risk' ? 'danger' : 'notice';
-                projectionMsg = `<div class="projection-box ${colorClass}">[META] Necesitas promediar al menos <b>${m.pointsNeededAverage} / 20 pts</b> en el <b>${m.remainingWeight}%</b> restante para aprobar.</div>`;
+                projectionMsg = `<div class="projection-box danger"><b>[REPROBADO]</b> Acumulaste ${displayAcumText}. Con el ${m.remainingWeight}% restante disponible no es posible alcanzar el 48% reglamentario.</div>`;
+            } else if (m.status === 'at_risk') {
+                projectionMsg = `<div class="projection-box danger"><b>[EN RIESGO]</b> Llevas <b>${displayAcumText}</b>. Te falta <b>${m.neededPct}%</b> acumulado para alcanzar el <b>48%</b> aprobatorio. Necesitas promediar alto en el ${m.remainingWeight}% restante.</div>`;
+            } else {
+                projectionMsg = `<div class="projection-box notice"><b>[META]</b> Llevas <b>${displayAcumText}</b> acumulado. Te falta <b>${m.neededPct}%</b> para alcanzar el <b>48%</b> (${cfg.passingDisplay}) y aprobar la materia.</div>`;
             }
 
-            // Desglose por cortes (1 al 4)
+            // Desglose por cortes (1 al 4 de 25% c/u)
             const cortesHtml = [1, 2, 3, 4].map(corteNum => {
-                const corteActs = m.subjActs.filter(a => String(a.corte) === String(corteNum));
+                const cb = m.corteBreakdown[corteNum];
+                const corteSubtotalPct = cb.earnedPct;
+                const corteSubtotalDisplay = pctToDisplay(corteSubtotalPct, mode);
+                const corteNominalMax = mode === 'percentage' ? '25%' : (mode === 'scale20' ? '5.00 pts' : '1.25 pts');
 
-                if (corteActs.length > 0) {
-                    // Muestra cada actividad del corte
-                    const actsList = corteActs.map(act => {
-                        const gradeVal = getActivityGrade(act.id);
-                        const displayVal = (gradeVal !== null && gradeVal !== undefined && gradeVal !== '')
-                            ? from20(parseFloat(gradeVal), mode)
+                let actsListHtml = '';
+                if (cb.acts.length > 0) {
+                    actsListHtml = cb.acts.map(act => {
+                        const gradePct = getActivityGrade(act.id);
+                        const displayVal = (gradePct !== null && gradePct !== undefined && gradePct !== '')
+                            ? pctToDisplay(parseFloat(gradePct), mode)
                             : '';
                         return `
                         <div class="grade-entry-row">
@@ -456,26 +564,16 @@ const Student = (() => {
                             </div>
                         </div>`;
                     }).join('');
-
-                    return `
-                    <div class="corte-block">
-                        <div class="corte-title-row">
-                            <span class="corte-tag-name">Corte ${corteNum}</span>
-                        </div>
-                        <div class="corte-acts-list">${actsList}</div>
-                    </div>`;
                 } else {
-                    // Sin actividades específicas del corte: input directo por corte (25%)
                     const customGrade = getCustomCorteGrade(s.id, corteNum);
                     const displayCustom = (customGrade !== null && customGrade !== undefined && customGrade !== '')
-                        ? from20(parseFloat(customGrade), mode)
+                        ? pctToDisplay(parseFloat(customGrade), mode)
                         : '';
-                    return `
-                    <div class="corte-block">
+                    actsListHtml = `
                         <div class="grade-entry-row">
                             <div style="flex:1;">
-                                <div class="grade-act-name">Corte ${corteNum}</div>
-                                <div class="grade-act-sub mono">25% (Estimado)</div>
+                                <div class="grade-act-name">Evaluación de Corte ${corteNum}</div>
+                                <div class="grade-act-sub mono">Corte estándar nominal de 25%</div>
                             </div>
                             <div class="grade-input-wrap">
                                 <input type="number" step="${cfg.step}" min="0" max="${cfg.max}" class="grade-num-input mono"
@@ -484,10 +582,24 @@ const Student = (() => {
                                     title="${cfg.title}">
                                 <span class="grade-scale-tag">${cfg.tag}</span>
                             </div>
-                        </div>
-                    </div>`;
+                        </div>`;
                 }
+
+                return `
+                <div class="corte-block">
+                    <div class="corte-title-row" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div>
+                            <span class="corte-tag-name">Corte ${corteNum} (25%)</span>
+                            ${cb.plannedWeight > 25 ? `<span class="mono" style="font-size:0.65rem;color:var(--cyan);margin-left:6px;">[EXTRA: ${cb.plannedWeight}%]</span>` : ''}
+                        </div>
+                        <span class="corte-subtotal-tag">Subtotal: ${corteSubtotalDisplay} / ${corteNominalMax}</span>
+                    </div>
+                    <div class="corte-acts-list">${actsListHtml}</div>
+                </div>`;
             }).join('');
+
+            const accumDisplay = pctToDisplay(m.totalAcumulado, mode);
+            const scaleTag = mode === 'percentage' ? '/ 100%' : (mode === 'scale20' ? '/ 20 pts' : '/ 5 pts');
 
             html += `
             <div class="subject-grade-card" style="border-top: 3px solid ${s.color || 'var(--cyan)'};">
@@ -496,7 +608,7 @@ const Student = (() => {
                         <span class="subj-grade-title">${s.name} ${s.shortName ? `<span class="mono">(${s.shortName})</span>` : ''}</span>
                         <div class="subj-grade-meta">
                             ${s.teacher ? `<span>Docente: ${s.teacher}</span>` : ''}
-                            ${s.room ? `<span>Aula ${s.room}</span>` : ''}
+                            ${s.room ? `<span>Aula: ${s.room}</span>` : ''}
                         </div>
                     </div>
                     ${statusBadge}
@@ -505,7 +617,11 @@ const Student = (() => {
                 <div class="subj-metrics-strip">
                     <div class="metric-cell">
                         <span class="metric-lbl">Acumulado</span>
-                        <span class="metric-val mono" style="color:var(--cyan);">${m.pointsAccumulated} <small style="font-size:0.6rem;color:var(--text-3)">/ 20</small></span>
+                        <span class="metric-val mono" style="color:var(--cyan);">${accumDisplay} <small style="font-size:0.6rem;color:var(--text-3)">${scaleTag}</small></span>
+                    </div>
+                    <div class="metric-cell">
+                        <span class="metric-lbl">Mín. Aprobatorio</span>
+                        <span class="metric-val mono" style="color:var(--green);">${cfg.passingDisplay}</span>
                     </div>
                     <div class="metric-cell">
                         <span class="metric-lbl">Evaluado</span>
@@ -526,6 +642,192 @@ const Student = (() => {
         });
 
         grid.innerHTML = html;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       EXPORTAR NOTAS EN PDF (jsPDF + AutoTable)
+    ═══════════════════════════════════════════════════════════ */
+    async function exportGradesPdf() {
+        const jsPDFClass = window.jspdf?.jsPDF || window.jsPDF;
+        if (!jsPDFClass) {
+            if (typeof Notify !== 'undefined') {
+                Notify.toast('Cargando librería PDF en el navegador, por favor intenta en un momento...', 'warning');
+            }
+            return;
+        }
+
+        const profile = getProfile() || {
+            fullName: 'Estudiante',
+            ci: 'V-00000000',
+            career: 'INGENIERÍA DE SISTEMAS',
+            sectionCode: '08S-2623-D1'
+        };
+
+        const subjects = (typeof Schedule !== 'undefined' ? Schedule.getSubjects() : []) || [];
+        if (subjects.length === 0) {
+            if (typeof Notify !== 'undefined') {
+                Notify.toast('No tienes materias inscritas para exportar', 'warning');
+            }
+            return;
+        }
+
+        const doc = new jsPDFClass({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+
+        // Fecha actual formateada
+        const today = new Date();
+        const dStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+        const tStr = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+        const dateFormatted = `${dStr} - ${tStr}`;
+
+        // Encabezado institucional elegante y sobrio (sin emojis)
+        doc.setFillColor(15, 23, 42); // slate dark #0f172a
+        doc.rect(0, 0, 216, 26, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.text('GESTOR ACADÉMICO UNIVERSITARIO - XK', 14, 11);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text('PLANILLA OFICIAL DE CALIFICACIONES Y RENDIMIENTO ACADÉMICO', 14, 17);
+        doc.text(`Fecha de Emisión: ${dateFormatted}`, 14, 22);
+
+        // Ficha del Estudiante
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(14, 32, 188, 26, 2, 2, 'FD');
+
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ESTUDIANTE:', 18, 39);
+        doc.text('CÉDULA:', 18, 46);
+        doc.text('CARRERA:', 18, 53);
+
+        doc.text('SECCIÓN:', 115, 39);
+        doc.text('SEMESTRE:', 115, 46);
+        doc.text('RÉGIMEN:', 115, 53);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text((profile.fullName || 'Estudiante').toUpperCase(), 44, 39);
+        doc.text((profile.ci || 'V-00000000').toUpperCase(), 44, 46);
+        doc.text((profile.career || 'INGENIERÍA DE SISTEMAS').toUpperCase(), 44, 53);
+
+        doc.text((profile.sectionCode || '08S-2623-D1').toUpperCase(), 138, 39);
+        doc.text('SEMESTRE VIII', 138, 46);
+        doc.text('4 CORTES DE 25% (MÍN. APROBATORIO: 48%)', 138, 53);
+
+        // Construcción de filas para autoTable
+        const rows = [];
+        let sumAcum = 0;
+        let passedCount = 0;
+
+        subjects.forEach(s => {
+            const m = calculateSubjectMetrics(s.id);
+            const c1 = m.corteScores[1] !== null ? `${m.corteScores[1].toFixed(1)}%` : '—';
+            const c2 = m.corteScores[2] !== null ? `${m.corteScores[2].toFixed(1)}%` : '—';
+            const c3 = m.corteScores[3] !== null ? `${m.corteScores[3].toFixed(1)}%` : '—';
+            const c4 = m.corteScores[4] !== null ? `${m.corteScores[4].toFixed(1)}%` : '—';
+            const totalPct = `${m.totalAcumulado.toFixed(1)}%`;
+            const equiv20 = `${(m.totalAcumulado * 0.20).toFixed(2)} pts`;
+
+            let estadoLabel = 'EN CURSO';
+            if (m.status === 'passed') {
+                estadoLabel = 'APROBADO';
+                passedCount++;
+            } else if (m.status === 'failed') {
+                estadoLabel = 'REPROBADO';
+            }
+
+            sumAcum += m.totalAcumulado;
+
+            rows.push([
+                `${s.name}\n[${s.code || s.shortName || 'MAT'}]`,
+                c1,
+                c2,
+                c3,
+                c4,
+                totalPct,
+                equiv20,
+                estadoLabel
+            ]);
+        });
+
+        const avgPct = subjects.length > 0 ? (sumAcum / subjects.length) : 0;
+        const avg20 = (avgPct * 0.20).toFixed(2);
+
+        doc.autoTable({
+            startY: 64,
+            head: [['Asignatura', 'Corte 1\n(25%)', 'Corte 2\n(25%)', 'Corte 3\n(25%)', 'Corte 4\n(25%)', 'Total\n(%)', 'Equivalente\n(20 pts)', 'Estado']],
+            body: rows,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [15, 23, 42],
+                textColor: [255, 255, 255],
+                fontSize: 8,
+                fontStyle: 'bold',
+                halign: 'center',
+                valign: 'middle'
+            },
+            columnStyles: {
+                0: { halign: 'left', cellWidth: 54, fontStyle: 'bold' },
+                1: { halign: 'center', cellWidth: 18 },
+                2: { halign: 'center', cellWidth: 18 },
+                3: { halign: 'center', cellWidth: 18 },
+                4: { halign: 'center', cellWidth: 18 },
+                5: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
+                6: { halign: 'center', cellWidth: 22, fontStyle: 'bold' },
+                7: { halign: 'center', cellWidth: 20, fontStyle: 'bold' }
+            },
+            styles: {
+                fontSize: 7.8,
+                cellPadding: 3.5,
+                valign: 'middle',
+                lineColor: [226, 232, 240],
+                lineWidth: 0.2
+            },
+            didParseCell: function(data) {
+                if (data.section === 'body' && data.column.index === 7) {
+                    if (data.cell.raw === 'APROBADO') {
+                        data.cell.styles.textColor = [16, 149, 106]; // green
+                    } else if (data.cell.raw === 'REPROBADO') {
+                        data.cell.styles.textColor = [220, 38, 38]; // red
+                    } else {
+                        data.cell.styles.textColor = [202, 138, 4]; // yellow/amber
+                    }
+                }
+            }
+        });
+
+        // Resumen final debajo de la tabla
+        const finalY = doc.lastAutoTable.finalY + 8;
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(14, finalY, 188, 22, 2, 2, 'FD');
+
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Total Materias Inscritas: ${subjects.length}`, 18, finalY + 7);
+        doc.text(`Materias Aprobadas: ${passedCount} de ${subjects.length}`, 80, finalY + 7);
+        doc.text(`Promedio Acumulado: ${avgPct.toFixed(1)}% (${avg20} / 20 pts)`, 138, finalY + 7);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text('* Nota mínima aprobatoria reglamentaria: 48.0% (Equivalente exacto a 9.60 / 20 pts y 2.40 / 5 pts).', 18, finalY + 14);
+        doc.text('Documento emitido electrónicamente desde el Gestor Académico XK · Válido para control de notas personal del estudiante.', 18, finalY + 18);
+
+        // Guardar archivo PDF
+        const cleanCi = (profile.ci || 'estudiante').replace(/[^a-zA-Z0-9]/g, '_');
+        doc.save(`Calificaciones_${cleanCi}_${new Date().toISOString().slice(0, 10)}.pdf`);
+
+        if (typeof Notify !== 'undefined') {
+            Notify.toast('Planilla de Calificaciones descargada en PDF con éxito', 'success');
+        }
     }
 
     function unlockWithPin() {
@@ -1217,6 +1519,10 @@ const Student = (() => {
         unlockWithPin,
         lockGrades,
         getGradeMode,
+        switchScale,
+        exportGradesPdf,
+        inputToPct,
+        pctToDisplay,
         // Identificación Estudiantil
         getProfile,
         hasActiveProfile,

@@ -22,6 +22,9 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <!-- Supabase JS Client (v2) -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- jsPDF & AutoTable para exportar calificaciones limpias en PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 
 <body>
@@ -284,12 +287,25 @@
                 <div class="grades-header-row">
                     <div>
                         <h2 class="section-title">Mis Notas & Rendimiento</h2>
-                        <p class="section-sub">Control individual por alumno (Escala 0–20 pts) · Datos guardados 100% en este dispositivo</p>
+                        <p class="section-sub">4 Cortes de 25% · Aprobación con 48% acumulado (9.60 / 20 pts) · Sincronización en tiempo real</p>
                     </div>
                     <div class="grades-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                        <button class="btn-ghost btn-sm" onclick="Student.exportStudentData()" title="Descargar copia JSON de mis notas y progreso">Exportar Notas</button>
+                        <!-- Switch de conversión en tiempo real (100% | 20 pts | 5 pts) -->
+                        <div class="grade-scale-switch-group" id="gradeScaleSwitchGroup" role="group" aria-label="Escala de visualización">
+                            <button type="button" class="scale-switch-btn" data-scale="percentage" onclick="Student.switchScale('percentage')">100%</button>
+                            <button type="button" class="scale-switch-btn" data-scale="scale20" onclick="Student.switchScale('scale20')">20 pts</button>
+                            <button type="button" class="scale-switch-btn" data-scale="scale5" onclick="Student.switchScale('scale5')">5 pts</button>
+                        </div>
+
+                        <!-- Botón Exportar Notas en PDF -->
+                        <button class="btn-primary btn-sm" onclick="Student.exportGradesPdf()" title="Descargar Planilla Oficial de Calificaciones en PDF" style="display:flex;align-items:center;gap:6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                            Exportar Notas en PDF
+                        </button>
+
+                        <button class="btn-ghost btn-sm" onclick="Student.exportStudentData()" title="Descargar copia JSON de mis notas y progreso">Respaldo JSON</button>
                         <label class="btn-ghost btn-sm" style="cursor:pointer;margin:0;" title="Cargar archivo JSON previo de mis notas">
-                            Importar Notas
+                            Importar JSON
                             <input type="file" id="inputStudentGradesFile" accept=".json" style="display:none" onchange="Student.importStudentDataFromFile(this)">
                         </label>
                     </div>
@@ -418,11 +434,11 @@
 
                         <div class="form-field">
                             <label class="form-label">Corte Académico *</label>
-                            <select class="form-select" id="actCorte">
-                                <option value="1">1er Corte</option>
-                                <option value="2">2do Corte</option>
-                                <option value="3">3er Corte</option>
-                                <option value="4">4to Corte</option>
+                            <select class="form-select" id="actCorte" onchange="Activities.updateWeightAlert()">
+                                <option value="1">Corte 1 (25%)</option>
+                                <option value="2">Corte 2 (25%)</option>
+                                <option value="3">Corte 3 (25%)</option>
+                                <option value="4">Corte 4 (25%)</option>
                             </select>
                         </div>
 

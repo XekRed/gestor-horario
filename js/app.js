@@ -295,15 +295,27 @@ const App = (() => {
 
         /* Average grade from Student module */
         if (typeof Student !== 'undefined') {
+            const mode = Student.getGradeMode ? Student.getGradeMode() : 'percentage';
             let sum = 0, count = 0;
             subjects.forEach(s => {
                 const m = Student.calculateSubjectMetrics(s.id);
                 if (m.evaluatedWeight > 0) {
-                    sum += (m.pointsAccumulated * (100 / m.evaluatedWeight));
+                    sum += m.totalAcumulado;
                     count++;
                 }
             });
-            document.getElementById('statPromedio').textContent = count > 0 ? (sum / count).toFixed(1) : '—';
+            if (count > 0) {
+                const avgPct = sum / count;
+                if (mode === 'scale20') {
+                    document.getElementById('statPromedio').textContent = `${(avgPct * 0.20).toFixed(1)} / 20`;
+                } else if (mode === 'scale5') {
+                    document.getElementById('statPromedio').textContent = `${(avgPct * 0.05).toFixed(1)} / 5`;
+                } else {
+                    document.getElementById('statPromedio').textContent = `${avgPct.toFixed(1)}%`;
+                }
+            } else {
+                document.getElementById('statPromedio').textContent = '—';
+            }
         } else {
             const grades = getGrades();
             if (grades.length > 0) {

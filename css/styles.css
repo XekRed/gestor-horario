@@ -2781,3 +2781,68 @@ body.ui-compact .timeline-card {
     max-width: 520px;
     line-height: 1.45;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SWITCH DE ESCALAS Y REGLAS DE EVALUACIÓN (4 CORTES DE 25%)
+═══════════════════════════════════════════════════════════════ */
+.grade-scale-switch-group {
+    display: inline-flex;
+    background: var(--bg-darkest);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 3px;
+    align-items: center;
+}
+
+.scale-switch-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.scale-switch-btn:hover {
+    color: var(--text-1);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.scale-switch-btn.active {
+    background: var(--cyan);
+    color: #050a14;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+}
+
+.weight-notice-text.extra {
+    color: var(--cyan);
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+.corte-subtotal-tag {
+    font-size: 0.7rem;
+    color: var(--cyan);
+    font-weight: 700;
+    font-family: var(--font-mono);
+    background: rgba(0, 240, 255, 0.08);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.corte-nominal-badge {
+    font-size: 0.65rem;
+    color: var(--text-3);
+    margin-left: 6px;
+}
