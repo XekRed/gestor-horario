@@ -138,16 +138,35 @@ const DB = (() => {
     /* ══════════════════════════════════════════════════════════
        MAPEO DE MODELOS (PostgreSQL Supabase ⇄ App Frontend)
     ═══════════════════════════════════════════════════════════ */
+    function _parseScheduleBlocks(val) {
+        if (!val) return [];
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') {
+            try {
+                const parsed = JSON.parse(val);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return [];
+            }
+        }
+        if (typeof val === 'object') {
+            if (Array.isArray(val.slots)) return val.slots;
+            if (Array.isArray(val.blocks)) return val.blocks;
+        }
+        return [];
+    }
+
     function _toClientSubject(row) {
         return {
             id:        row.id,
-            code:      row.subject_code,
+            code:      row.subject_code || row.code,
+            section:   row.section_code || row.section || '08S-2623-D1',
             name:      row.name,
-            shortName: row.short_name || row.name.slice(0, 4),
-            room:      row.classroom || '',
-            teacher:   row.professor || '',
+            shortName: row.short_name || row.shortName || (row.name ? row.name.slice(0, 4) : 'MAT'),
+            room:      row.classroom || row.room || '',
+            teacher:   row.professor || row.teacher || '',
             color:     row.color || '#00f0ff',
-            slots:     Array.isArray(row.schedule_blocks) ? row.schedule_blocks : []
+            slots:     _parseScheduleBlocks(row.schedule_blocks || row.slots)
         };
     }
 
@@ -410,15 +429,18 @@ const DB = (() => {
                 const { data, error } = await _supabase
                     .from('sections')
                     .select('*')
-                    .limit(1)
-                    .single();
+                    .order('updated_at', { ascending: true });
 
-                if (data && !error) {
+                if (data && !error && data.length > 0) {
+                    _cache['sections'] = data;
+                    localStorage.setItem('gx_sections_catalog', JSON.stringify(data));
+                    const currentSecCode = getSettings().seccion || '08S-2623-D1';
+                    const activeSec = data.find(s => s.section_code === currentSecCode) || data[0];
                     const settingsObj = {
-                        carrera:  data.career || 'INGENIERÍA DE SISTEMAS',
-                        semestre: data.semester || 'VIII',
-                        seccion:  data.section_code || '08S-2623-D1',
-                        periodo:  data.period || '2026-I (Diurno)'
+                        carrera:  activeSec.career || 'INGENIERÍA DE SISTEMAS',
+                        semestre: activeSec.semester || 'VIII',
+                        seccion:  activeSec.section_code || '08S-2623-D1',
+                        periodo:  activeSec.period || '2026-I (Diurno)'
                     };
                     _cache['settings'] = settingsObj;
                     localStorage.setItem(LS.settings, JSON.stringify(settingsObj));
@@ -622,6 +644,96 @@ const DB = (() => {
                 console.error('[DB] Error guardando settings en Supabase:', e);
             }
         }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       CATÁLOGO DE SECCIONES (DINÁMICO PARA ONBOARDING Y ADMIN)
+    ═══════════════════════════════════════════════════════════ */
+    function getSections() {
+        if (_cache['sections'] && Array.isArray(_cache['sections']) && _cache['sections'].length > 0) {
+            return _cache['sections'];
+        }
+        try {
+            const raw = localStorage.getItem('gx_sections_catalog');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    _cache['sections'] = parsed;
+                    return parsed;
+                }
+            }
+        } catch (e) {}
+
+        const defaultSections = [
+            {
+                id: '08S-2623-D1',
+                career: 'INGENIERÍA DE SISTEMAS',
+                semester: 'VIII',
+                section_code: '08S-2623-D1',
+                period: '2026-I (Diurno)'
+            }
+        ];
+        _cache['sections'] = defaultSections;
+        localStorage.setItem('gx_sections_catalog', JSON.stringify(defaultSections));
+        return defaultSections;
+    }
+
+    async function saveSection(sectionData) {
+        if (!sectionData || !sectionData.section_code) return null;
+        const code = sectionData.section_code.trim().toUpperCase();
+        const cleanSec = {
+            id: code,
+            career: (sectionData.career || 'INGENIERÍA DE SISTEMAS').trim().toUpperCase(),
+            semester: (sectionData.semester || 'VIII').trim().toUpperCase(),
+            section_code: code,
+            period: (sectionData.period || '2026-I (Diurno)').trim(),
+            updated_at: new Date().toISOString()
+        };
+
+        const current = [...getSections()];
+        const idx = current.findIndex(s => s.section_code === code);
+        if (idx >= 0) {
+            current[idx] = cleanSec;
+        } else {
+            current.push(cleanSec);
+        }
+        _cache['sections'] = current;
+        localStorage.setItem('gx_sections_catalog', JSON.stringify(current));
+
+        if (_supabase) {
+            try {
+                await _supabase.from('sections').upsert(cleanSec, { onConflict: 'section_code' });
+            } catch (e) {
+                console.warn('[DB] Error guardando sección en Supabase:', e);
+            }
+        }
+        return cleanSec;
+    }
+
+    async function deleteSection(sectionCode) {
+        if (!sectionCode) return false;
+        const code = sectionCode.trim().toUpperCase();
+        let current = getSections().filter(s => s.section_code !== code);
+        if (current.length === 0) {
+            current = [{
+                id: '08S-2623-D1',
+                career: 'INGENIERÍA DE SISTEMAS',
+                semester: 'VIII',
+                section_code: '08S-2623-D1',
+                period: '2026-I (Diurno)'
+            }];
+        }
+        _cache['sections'] = current;
+        localStorage.setItem('gx_sections_catalog', JSON.stringify(current));
+
+        if (_supabase) {
+            try {
+                await _supabase.from('sections').delete().eq('section_code', code);
+            } catch (e) {
+                console.warn('[DB] Error eliminando sección en Supabase:', e);
+            }
+        }
+        return true;
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -958,6 +1070,9 @@ const DB = (() => {
         removeOne,
         getSettings,
         saveSettings,
+        getSections,
+        saveSection,
+        deleteSection,
         loginWithPassword,
         loginWithMagicLink,
         logoutAdmin,

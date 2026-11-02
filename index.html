@@ -33,6 +33,138 @@
     <div class="bg-particles" id="particles"></div>
     <div class="scanlines"></div>
 
+    
+    <!-- ══════════════════ ASISTENTE DE ONBOARDING Y BLOQUEO DE INTERFAZ ══════════════════ -->
+    <div id="onboardingContainer" class="onboarding-overlay" style="display:none;">
+        <div class="onboarding-bg-glow"></div>
+        <button class="onboarding-admin-corner-btn" onclick="Admin.openPinModal()" title="Acceso exclusivo para Administradores y Dueño">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Acceso Admin / Owner
+        </button>
+
+        <div class="onboarding-card">
+            <!-- Header -->
+            <div class="onboarding-header">
+                <div class="onboarding-logo-badge">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="28" height="28"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                </div>
+                <h1 class="onboarding-title">GESTOR ACADÉMICO</h1>
+                <p class="onboarding-subtitle">Sistema Universitario · Portal Estudiantil</p>
+                <div class="onboarding-stepper">
+                    <div class="onboarding-step-pill active" id="obStepPill1">
+                        <span class="step-num">1</span>
+                        <span class="step-lbl">Identificación (Obligatorio)</span>
+                    </div>
+                    <div class="onboarding-step-divider"></div>
+                    <div class="onboarding-step-pill" id="obStepPill2">
+                        <span class="step-num">2</span>
+                        <span class="step-lbl">Inscribir Materias (Opcional)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PASO 1: Identificación y Selectores en Cascada -->
+            <div id="onboardingStep1" class="onboarding-step-content">
+                <div id="obLookupNotice" class="lookup-notice-badge" style="display:none;"></div>
+
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label class="form-label">Cédula de Identidad (V- / E-)</label>
+                        <input type="text" class="form-input" id="obInputCi" placeholder="Ej: 28456123 o V-28456123" inputmode="numeric" oninput="Student.onCiInput()" onblur="Student.onCiBlur()">
+                        <span style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">Escribe tu cédula: si ya estás registrado, tus datos se sincronizarán al instante.</span>
+                    </div>
+
+                    <div class="form-field" id="obPinContainer" style="display:none;">
+                        <label class="form-label" style="color:var(--cyan);">PIN de Seguridad del Perfil</label>
+                        <input type="password" class="form-input" id="obInputPin" placeholder="Ingresa tu clave de 4-6 dígitos">
+                        <span style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">Tu perfil tiene clave de protección activada.</span>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Nombre Completo</label>
+                        <input type="text" class="form-input" id="obInputName" placeholder="Ej: Andrea Mendoza">
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Carrera</label>
+                        <select class="form-input" id="obSelectCarrera" onchange="Student.onCascadeCareerChange()">
+                            <option value="">Selecciona tu Carrera...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-label">Semestre</label>
+                        <select class="form-input" id="obSelectSemestre" disabled onchange="Student.onCascadeSemesterChange()">
+                            <option value="">Primero selecciona una Carrera</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field" style="grid-column: 1 / -1;">
+                        <label class="form-label">Código de Sección</label>
+                        <select class="form-input" id="obSelectSeccion" disabled onchange="Student.onCascadeSectionChange()">
+                            <option value="">Primero selecciona Semestre</option>
+                        </select>
+                        <span style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">Los códigos de sección corresponden a las asignadas activas por el Administrador.</span>
+                    </div>
+                </div>
+
+                <div class="onboarding-actions" style="margin-top:20px;display:flex;justify-content:flex-end;">
+                    <button type="button" class="btn-primary" style="padding:10px 24px;font-size:0.88rem;display:flex;align-items:center;gap:8px;" onclick="Student.submitOnboardingStep1()">
+                        Continuar al Paso 2: Inscribir Materias
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PASO 2: Inscribir Materias Recomendadas o por Código -->
+            <div id="onboardingStep2" class="onboarding-step-content" style="display:none;">
+                <div class="ob-step2-top-bar">
+                    <div class="ob-step2-info">
+                        <span class="mono" style="color:var(--cyan);font-weight:700;" id="obStep2SecInfo">Sección: —</span>
+                        <span style="font-size:0.75rem;color:var(--text-2);">Materias recomendadas para tu semestre</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button type="button" class="btn-ghost btn-sm" onclick="Student.enrollAllSectionSubjects()" style="color:var(--green);border-color:rgba(0,229,160,0.3);background:rgba(0,229,160,0.06);">
+                            Inscribir todas las de mi sección
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ob-search-row" style="margin-top:12px;margin-bottom:12px;">
+                    <input type="text" class="form-input" id="obSearchCodeInput" placeholder="Buscar materia por código (ej: AUD-08S, TEL-08S)..." oninput="Student.onObSearchInput()">
+                </div>
+
+                <div class="ob-step2-grid">
+                    <!-- Columna izquierda: Lista de materias -->
+                    <div class="ob-step2-list-col">
+                        <div class="ob-subjects-list" id="obSubjectsList">
+                            <!-- Inyectado por Student.renderOnboardingStep2() -->
+                        </div>
+                    </div>
+                    <!-- Columna derecha: Vista previa interactiva -->
+                    <div class="ob-step2-preview-col">
+                        <div class="ob-preview-container" id="obSubjectPreview">
+                            <div class="ob-preview-placeholder">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="32" height="32" style="color:var(--text-3);margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                                <div>Selecciona una materia de la lista para ver sus horarios, profesor, aula y actividades programadas.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="onboarding-footer-actions" style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;">
+                    <button type="button" class="btn-ghost" onclick="Student.finishOnboarding()" style="font-size:0.8rem;color:var(--text-3);">
+                        Ir al Panel Principal (Inscribir más tarde)
+                    </button>
+                    <button type="button" class="btn-primary" onclick="Student.finishOnboarding()" style="padding:10px 24px;font-size:0.88rem;display:flex;align-items:center;gap:8px;">
+                        Finalizar y Entrar al Horario
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
 
         <!-- ══════════════════ HEADER ══════════════════ -->
@@ -872,14 +1004,44 @@
                 <!-- ── TAB 3: CONFIGURACIÓN SECCIÓN ── -->
                 <div class="admin-tab-panel" id="atab-section">
                     <div class="admin-system-card">
-                        <div class="admin-card-title">Datos de la Carrera y Sección</div>
-                        <div class="admin-card-desc">Personaliza la información mostrada en el encabezado y reportes.
-                        </div>
+                        <div class="admin-card-title">Catálogo de Secciones Creadas</div>
+                        <div class="admin-card-desc">Lista de combinaciones de Carrera, Semestre y Sección disponibles para los estudiantes en el Onboarding.</div>
+                        <div id="adminSectionsCatalogList" style="margin-top:12px;"></div>
+                    </div>
+
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Registrar Nueva Sección</div>
+                        <div class="admin-card-desc">Crea una nueva combinación académica para ofertar materias y permitir el registro de alumnos.</div>
                         <div class="form-grid">
                             <div class="form-field">
                                 <label class="form-label">Carrera</label>
-                                <input type="text" class="form-input" id="setCarrera"
-                                    placeholder="INGENIERÍA DE SISTEMAS">
+                                <input type="text" class="form-input" id="newSecCarrera" placeholder="Ej: INGENIERÍA DE SISTEMAS">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Semestre</label>
+                                <input type="text" class="form-input" id="newSecSemestre" placeholder="Ej: VIII">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Código de Sección</label>
+                                <input type="text" class="form-input" id="newSecCode" placeholder="Ej: 08S-2623-D1">
+                            </div>
+                            <div class="form-field">
+                                <label class="form-label">Período / Turno</label>
+                                <input type="text" class="form-input" id="newSecPeriodo" placeholder="2026-I (Diurno)">
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;text-align:right;">
+                            <button class="btn-primary btn-sm" onclick="Admin.createSection()">Registrar Sección</button>
+                        </div>
+                    </div>
+
+                    <div class="admin-system-card">
+                        <div class="admin-card-title">Configuración de Sección Activa</div>
+                        <div class="admin-card-desc">Personaliza la información de la sección principal por defecto.</div>
+                        <div class="form-grid">
+                            <div class="form-field">
+                                <label class="form-label">Carrera</label>
+                                <input type="text" class="form-input" id="setCarrera" placeholder="INGENIERÍA DE SISTEMAS">
                             </div>
                             <div class="form-field">
                                 <label class="form-label">Semestre</label>
@@ -895,8 +1057,7 @@
                             </div>
                         </div>
                         <div style="margin-top:14px;text-align:right;">
-                            <button class="btn-primary btn-sm" onclick="Admin.saveSectionSettings()">Guardar Datos de
-                                Sección</button>
+                            <button class="btn-primary btn-sm" onclick="Admin.saveSectionSettings()">Guardar Datos de Sección</button>
                         </div>
                     </div>
 

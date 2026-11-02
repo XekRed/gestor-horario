@@ -2846,3 +2846,338 @@ body.ui-compact .timeline-card {
     color: var(--text-3);
     margin-left: 6px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   BLOQUEO ESTRICTO DE INTERFAZ Y ONBOARDING EN 2 PASOS
+═══════════════════════════════════════════════════════════════ */
+
+/* Bloqueo total de la app si no hay perfil ni sesión admin */
+body.app-locked {
+    overflow: hidden !important;
+}
+
+body.app-locked .app-container {
+    display: none !important;
+}
+
+body.app-locked .app-footer {
+    display: none !important;
+}
+
+/* Overlay general de onboarding */
+.onboarding-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 15%, #0d1e38, #050a14 85%);
+    backdrop-filter: blur(14px);
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.onboarding-bg-glow {
+    position: absolute;
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle, rgba(0, 240, 255, 0.12), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.onboarding-admin-corner-btn {
+    position: absolute;
+    top: 18px;
+    right: 24px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: var(--text-2);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.onboarding-admin-corner-btn:hover {
+    background: rgba(0, 240, 255, 0.1);
+    border-color: var(--cyan);
+    color: var(--cyan);
+}
+
+.onboarding-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 820px;
+    background: var(--bg-card, #091322);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.7), 0 0 50px rgba(0, 240, 255, 0.08);
+    padding: 30px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.onboarding-header {
+    text-align: center;
+    margin-bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.onboarding-logo-badge {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cyan);
+    margin-bottom: 12px;
+}
+
+.onboarding-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--text-1);
+    margin: 0;
+}
+
+.onboarding-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-2);
+    margin-top: 4px;
+}
+
+.onboarding-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 18px;
+    width: 100%;
+    max-width: 540px;
+}
+
+.onboarding-step-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    font-size: 0.74rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.onboarding-step-pill.active {
+    background: rgba(0, 240, 255, 0.1);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+}
+
+.onboarding-step-pill.done {
+    background: rgba(0, 229, 160, 0.1);
+    border-color: var(--green);
+    color: var(--green);
+}
+
+.onboarding-step-pill .step-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: currentColor;
+    color: #050a14;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 800;
+}
+
+.onboarding-step-divider {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    min-width: 16px;
+}
+
+.lookup-notice-badge {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.4;
+}
+
+.lookup-notice-badge.success {
+    background: rgba(0, 229, 160, 0.12);
+    border: 1px solid rgba(0, 229, 160, 0.35);
+    color: var(--green);
+}
+
+.lookup-notice-badge.notice {
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: var(--cyan);
+}
+
+/* Paso 2: Grilla y Preview */
+.ob-step2-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ob-step2-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ob-step2-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 14px;
+    min-height: 380px;
+    max-height: 52vh;
+}
+
+.ob-step2-list-col {
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.ob-step2-preview-col {
+    background: var(--bg-surface, #0d1a2d);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.ob-subjects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ob-subj-card {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ob-subj-card:hover {
+    border-color: rgba(0, 240, 255, 0.4);
+    background: rgba(0, 240, 255, 0.04);
+}
+
+.ob-subj-card.selected {
+    border-color: var(--cyan);
+    background: rgba(0, 240, 255, 0.08);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+}
+
+.ob-subj-card.enrolled {
+    border-left: 3px solid var(--green);
+}
+
+.ob-subj-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-1);
+}
+
+.ob-subj-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 0.7rem;
+    color: var(--text-3);
+    align-items: center;
+}
+
+.ob-subj-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ob-preview-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 0.78rem;
+    padding: 24px;
+}
+
+.badge-status-enrolled {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--green);
+    background: rgba(0, 229, 160, 0.12);
+    border: 1px solid rgba(0, 229, 160, 0.3);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+.badge-status-available {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--text-3);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+@media (max-width: 680px) {
+    .ob-step2-grid {
+        grid-template-columns: 1fr;
+        max-height: none;
+    }
+    .onboarding-card {
+        padding: 18px;
+    }
+}

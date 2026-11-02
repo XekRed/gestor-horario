@@ -52,6 +52,12 @@ const App = (() => {
             DB.subscribe('settings', () => {
                 loadSettings();
             });
+
+            DB.subscribe('sections', () => {
+                if (typeof Student !== 'undefined' && Student.populateCascadeCareers) {
+                    Student.populateCascadeCareers();
+                }
+            });
         }
 
         // Load settings
@@ -61,6 +67,7 @@ const App = (() => {
         if (typeof Prefs !== 'undefined') Prefs.init();
         if (typeof Student !== 'undefined') {
             Student.updateHeaderProfile();
+            Student.checkOnboardingLock();
         }
         Schedule.init();
 
@@ -102,9 +109,9 @@ const App = (() => {
         if (typeof Prefs !== 'undefined') switchTab(Prefs.getDefaultTab());
         if (window.lucide) lucide.createIcons();
 
-        // Si no tiene perfil activo guardado, abrir ventana de bienvenida e identificación
-        if (typeof Student !== 'undefined' && !Student.hasActiveProfile()) {
-            setTimeout(() => Student.openIdentificationModal(), 300);
+        // Verificación de bloqueo de interfaz (Onboarding obligatorio si no hay perfil ni sesión admin)
+        if (typeof Student !== 'undefined' && Student.checkOnboardingLock) {
+            Student.checkOnboardingLock();
         }
     }
 

@@ -850,8 +850,28 @@ const Student = (() => {
     }
 
     /* ══════════════════════════════════════════════════════════
-       4. IDENTIFICACIÓN DEL ESTUDIANTE Y PERFIL (SINCRONIZADO POR CÉDULA)
+       4. IDENTIFICACIÓN ESTUDIANTIL, BLOQUEO Y ONBOARDING EN 2 PASOS
     ═══════════════════════════════════════════════════════════ */
+
+    // Parseo seguro de bloques de horario (array, json string u objeto)
+    function parseScheduleBlocks(blocks) {
+        if (!blocks) return [];
+        if (Array.isArray(blocks)) return blocks;
+        if (typeof blocks === 'string') {
+            try {
+                const parsed = JSON.parse(blocks);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return [];
+            }
+        }
+        if (typeof blocks === 'object') {
+            if (Array.isArray(blocks.slots)) return blocks.slots;
+            if (Array.isArray(blocks.blocks)) return blocks.blocks;
+        }
+        return [];
+    }
+
     function getProfile() {
         try {
             const raw = localStorage.getItem(LS.profile);
@@ -876,227 +896,648 @@ const Student = (() => {
         const p = getProfile();
         const carreraEl = document.getElementById('metaCarrera');
         const seccionEl = document.getElementById('metaSeccion');
+        const semestreEl = document.getElementById('metaSemestre');
         const studentNameEl = document.getElementById('metaStudentName');
+        const studentBadge = document.getElementById('metaStudentBadge');
+        const studentSep = document.getElementById('metaStudentSep');
 
         if (p) {
             if (carreraEl && p.career) carreraEl.textContent = p.career.toUpperCase();
             if (seccionEl && p.sectionCode) seccionEl.textContent = p.sectionCode.toUpperCase();
+            if (semestreEl && p.semester) semestreEl.textContent = p.semester.toUpperCase();
             if (studentNameEl) studentNameEl.textContent = `${p.fullName || 'Estudiante'} [${p.ci}]`;
+            if (studentBadge) studentBadge.style.display = 'flex';
+            if (studentSep) studentSep.style.display = 'inline-block';
         } else {
             if (studentNameEl) studentNameEl.textContent = 'Identificarse';
+            if (studentBadge) studentBadge.style.display = 'none';
+            if (studentSep) studentSep.style.display = 'none';
         }
     }
 
-    function openIdentificationModal() {
-        const modal = document.getElementById('modalStudentLogin');
-        if (!modal) return;
-        const p = getProfile();
-        if (p) {
-            const nameIn = document.getElementById('studentRegName');
-            const ciIn = document.getElementById('studentRegCi');
-            const carIn = document.getElementById('studentRegCareer');
-            const secIn = document.getElementById('studentRegSection');
-            if (nameIn) nameIn.value = p.fullName || '';
-            if (ciIn) ciIn.value = p.ci || '';
-            if (carIn) carIn.value = p.career || 'INGENIERÍA DE SISTEMAS';
-            if (secIn) secIn.value = p.sectionCode || '08S-2623-D1';
-        }
-        modal.classList.add('open');
-    }
+    /* ── BLOQUEO ESTRICTO DE INTERFAZ ───────────────────────── */
+    function checkOnboardingLock() {
+        const hasProf = hasActiveProfile();
+        const isAdmin = (typeof DB !== 'undefined' && DB.isAdminUnlocked && DB.isAdminUnlocked());
+        const obScreen = document.getElementById('onboardingContainer');
 
-    function closeIdentificationModal(force = false) {
-        if (force || hasActiveProfile()) {
-            document.getElementById('modalStudentLogin')?.classList.remove('open');
-        }
-    }
-
-    function switchIdTab(tab) {
-        const tabNew = document.getElementById('btnIdTabNew');
-        const tabExist = document.getElementById('btnIdTabExisting');
-        const panelNew = document.getElementById('panelIdNew');
-        const panelExist = document.getElementById('panelIdExisting');
-        const errEl = document.getElementById('studentLoginErrorMsg');
-        if (errEl) errEl.style.display = 'none';
-
-        if (tab === 'existing') {
-            tabNew?.classList.remove('active');
-            tabExist?.classList.add('active');
-            if (panelNew) panelNew.style.display = 'none';
-            if (panelExist) panelExist.style.display = 'block';
-            setTimeout(() => document.getElementById('studentLoginCi')?.focus(), 100);
-        } else {
-            tabNew?.classList.add('active');
-            tabExist?.classList.remove('active');
-            if (panelNew) panelNew.style.display = 'block';
-            if (panelExist) panelExist.style.display = 'none';
-            setTimeout(() => document.getElementById('studentRegName')?.focus(), 100);
-        }
-    }
-
-    async function submitNewStudentForm() {
-        const nameIn = document.getElementById('studentRegName');
-        const ciIn   = document.getElementById('studentRegCi');
-        const carIn  = document.getElementById('studentRegCareer');
-        const secIn  = document.getElementById('studentRegSection');
-        const errEl  = document.getElementById('studentLoginErrorMsg');
-
-        if (errEl) errEl.style.display = 'none';
-
-        const fullName = nameIn?.value.trim();
-        const rawCi    = ciIn?.value.trim().toUpperCase();
-        const career   = carIn?.value.trim() || 'INGENIERÍA DE SISTEMAS';
-        const sectionCode = secIn?.value.trim().toUpperCase() || '08S-2623-D1';
-
-        if (!fullName || fullName.length < 3) {
-            showIdError('Por favor ingresa tu Nombre Completo.');
-            return;
-        }
-
-        if (!rawCi || rawCi.length < 5) {
-            showIdError('Por favor ingresa una Cédula válida (Ej: V-28123456).');
-            return;
-        }
-
-        const formattedCi = rawCi.startsWith('V-') || rawCi.startsWith('E-') ? rawCi : `V-${rawCi}`;
-
-        const profileData = {
-            ci: formattedCi,
-            fullName,
-            career,
-            sectionCode
-        };
-
-        saveProfile(profileData);
-
-        // Nuevo estudiante: inicia con horario en blanco (0 materias inscritas)
-        localStorage.setItem(LS.enrolled, JSON.stringify([]));
-
-        if (typeof DB !== 'undefined' && DB.saveStudent) {
-            try {
-                await DB.saveStudent(profileData);
-            } catch (e) {
-                console.warn('[Student] Error guardando en Supabase:', e);
+        if (!hasProf && !isAdmin) {
+            // Bloqueo total del resto de la app
+            document.body.classList.add('app-locked');
+            if (obScreen) {
+                obScreen.style.display = 'flex';
+                initOnboardingStep1();
             }
+        } else {
+            // Desbloqueo y renderizado normal
+            document.body.classList.remove('app-locked');
+            if (obScreen) {
+                obScreen.style.display = 'none';
+            }
+            updateHeaderProfile();
         }
-
-        closeIdentificationModal(true);
-        _refreshAllAppViews();
-
-        if (typeof Notify !== 'undefined') {
-            Notify.toast(`Bienvenido, ${fullName}. Tu horario inicia en blanco. ¡Inscribe tus materias para comenzar!`, 'success', 4500);
-        }
-
-        setTimeout(() => {
-            openEnrollModal();
-        }, 600);
     }
 
-    async function submitExistingStudentForm() {
-        const ciIn   = document.getElementById('studentLoginCi');
-        const pinIn  = document.getElementById('studentLoginPin');
-        const errEl  = document.getElementById('studentLoginErrorMsg');
+    /* ── PASO 1 DEL ONBOARDING: IDENTIFICACIÓN Y CASCADA ────── */
+    let _ciLookupTimeout = null;
 
-        if (errEl) errEl.style.display = 'none';
+    function initOnboardingStep1() {
+        const step1 = document.getElementById('onboardingStep1');
+        const step2 = document.getElementById('onboardingStep2');
+        const pill1 = document.getElementById('obStepPill1');
+        const pill2 = document.getElementById('obStepPill2');
 
-        const rawCi = ciIn?.value.trim().toUpperCase();
-        const pin   = pinIn?.value.trim();
+        if (step1) step1.style.display = 'block';
+        if (step2) step2.style.display = 'none';
+        if (pill1) { pill1.classList.add('active'); pill1.classList.remove('done'); }
+        if (pill2) { pill2.classList.remove('active', 'done'); }
 
-        if (!rawCi || rawCi.length < 5) {
-            showIdError('Por favor ingresa tu Cédula de Identidad.');
+        const p = getProfile();
+        const ciInput = document.getElementById('obInputCi');
+        const nameInput = document.getElementById('obInputName');
+
+        if (p) {
+            if (ciInput) ciInput.value = p.ci || '';
+            if (nameInput) nameInput.value = p.fullName || '';
+            populateCascadeCareers(p.career, p.semester, p.sectionCode);
+        } else {
+            populateCascadeCareers();
+        }
+    }
+
+    function populateCascadeCareers(selCareer = '', selSemester = '', selSection = '') {
+        const careerSelect = document.getElementById('obSelectCareer');
+        if (!careerSelect) return;
+
+        const sections = (typeof DB !== 'undefined' && DB.getSections) ? DB.getSections() : [];
+        const careers = [...new Set(sections.map(s => (s.career || '').trim().toUpperCase()).filter(Boolean))].sort();
+
+        if (careers.length === 0) {
+            careers.push('INGENIERÍA DE SISTEMAS');
+        }
+
+        careerSelect.innerHTML = '<option value="">Selecciona Carrera...</option>' +
+            careers.map(c => `<option value="${c}">${c}</option>`).join('');
+
+        if (selCareer && careers.includes(selCareer.toUpperCase())) {
+            careerSelect.value = selCareer.toUpperCase();
+            onCascadeCareerChange(selCareer.toUpperCase(), selSemester, selSection);
+        } else {
+            onCascadeCareerChange('', '', '');
+        }
+    }
+
+    function onCascadeCareerChange(career, selSemester = '', selSection = '') {
+        const semSelect = document.getElementById('obSelectSemester');
+        const secSelect = document.getElementById('obSelectSection');
+        if (!semSelect || !secSelect) return;
+
+        const cleanCareer = (career || '').trim().toUpperCase();
+        if (!cleanCareer) {
+            semSelect.disabled = true;
+            semSelect.innerHTML = '<option value="">Esperando Carrera...</option>';
+            secSelect.disabled = true;
+            secSelect.innerHTML = '<option value="">Esperando Semestre...</option>';
             return;
         }
 
-        const formattedCi = rawCi.startsWith('V-') || rawCi.startsWith('E-') ? rawCi : `V-${rawCi}`;
+        const sections = (typeof DB !== 'undefined' && DB.getSections) ? DB.getSections() : [];
+        const semesters = [...new Set(
+            sections
+                .filter(s => (s.career || '').trim().toUpperCase() === cleanCareer)
+                .map(s => (s.semester || '').trim().toUpperCase())
+                .filter(Boolean)
+        )].sort();
+
+        if (semesters.length === 0) {
+            semesters.push('VIII');
+        }
+
+        semSelect.disabled = false;
+        semSelect.innerHTML = '<option value="">Selecciona Semestre...</option>' +
+            semesters.map(sm => `<option value="${sm}">Semestre ${sm}</option>`).join('');
+
+        if (selSemester && semesters.includes(selSemester.toUpperCase())) {
+            semSelect.value = selSemester.toUpperCase();
+            onCascadeSemesterChange(selSemester.toUpperCase(), selSection);
+        } else {
+            onCascadeSemesterChange('', '');
+        }
+    }
+
+    function onCascadeSemesterChange(semester, selSection = '') {
+        const careerSelect = document.getElementById('obSelectCareer');
+        const secSelect = document.getElementById('obSelectSection');
+        if (!careerSelect || !secSelect) return;
+
+        const cleanCareer = (careerSelect.value || '').trim().toUpperCase();
+        const cleanSemester = (semester || '').trim().toUpperCase();
+
+        if (!cleanCareer || !cleanSemester) {
+            secSelect.disabled = true;
+            secSelect.innerHTML = '<option value="">Esperando Semestre...</option>';
+            return;
+        }
+
+        const sections = (typeof DB !== 'undefined' && DB.getSections) ? DB.getSections() : [];
+        const matching = sections.filter(s =>
+            (s.career || '').trim().toUpperCase() === cleanCareer &&
+            (s.semester || '').trim().toUpperCase() === cleanSemester
+        );
+
+        if (matching.length === 0) {
+            matching.push({ section_code: '08S-2623-D1', period: '2026-I (Diurno)' });
+        }
+
+        secSelect.disabled = false;
+        secSelect.innerHTML = '<option value="">Selecciona Sección...</option>' +
+            matching.map(s => `<option value="${s.section_code}">${s.section_code} (${s.period || 'Regular'})` + '</option>').join('');
+
+        if (selSection && matching.some(s => s.section_code === selSection.toUpperCase())) {
+            secSelect.value = selSection.toUpperCase();
+        } else if (matching.length === 1) {
+            secSelect.value = matching[0].section_code;
+        }
+    }
+
+    function onCascadeSectionChange(sectionCode) {
+        // Callback al cambiar de sección
+    }
+
+    // Normalizador de Cédula (tolerante a puntos, prefijos y espacios)
+    function normalizeCi(raw) {
+        if (!raw) return '';
+        const cleaned = String(raw).trim().toUpperCase().replace(/[.\s]/g, '');
+        const numOnly = cleaned.replace(/[^0-9]/g, '');
+        if (!numOnly) return '';
+        const prefix = cleaned.startsWith('E') ? 'E-' : 'V-';
+        return `${prefix}${numOnly}`;
+    }
+
+    function onCiInput(rawVal) {
+        clearTimeout(_ciLookupTimeout);
+        _ciLookupTimeout = setTimeout(() => {
+            lookupStudentByCi(rawVal);
+        }, 500);
+    }
+
+    function onCiBlur(rawVal) {
+        clearTimeout(_ciLookupTimeout);
+        lookupStudentByCi(rawVal);
+    }
+
+    async function lookupStudentByCi(rawVal) {
+        const noticeEl = document.getElementById('obLookupNotice');
+        const pinWrap = document.getElementById('obPinWrap');
+        const nameInput = document.getElementById('obInputName');
+        const normCi = normalizeCi(rawVal);
+
+        if (!normCi || normCi.length < 5) {
+            if (noticeEl) noticeEl.style.display = 'none';
+            if (pinWrap) pinWrap.style.display = 'none';
+            return;
+        }
 
         let student = null;
         if (typeof DB !== 'undefined' && DB.getStudentByCi) {
-            student = await DB.getStudentByCi(formattedCi);
+            student = await DB.getStudentByCi(normCi);
         }
 
-        if (!student) {
-            showIdError(`Cédula [${formattedCi}] no encontrada. Si eres nuevo, regístrate en la pestaña "Nuevo Estudiante".`);
+        if (student) {
+            if (noticeEl) {
+                noticeEl.className = 'lookup-notice-badge success';
+                noticeEl.style.display = 'block';
+                noticeEl.innerHTML = `[ESTUDIANTE ENCONTRADO] ¡Hola, <b>${student.full_name || student.fullName || 'Estudiante'}</b>! Tus datos fueron recuperados automáticamente.`;
+            }
+            if (nameInput && !nameInput.value.trim()) {
+                nameInput.value = student.full_name || student.fullName || '';
+            }
+            if (student.pin) {
+                if (pinWrap) pinWrap.style.display = 'block';
+            } else {
+                if (pinWrap) pinWrap.style.display = 'none';
+            }
+
+            // Seleccionar sección en cascada si coincide
+            const savedSec = student.section_code || student.sectionCode;
+            if (savedSec && typeof DB !== 'undefined' && DB.getSections) {
+                const secObj = DB.getSections().find(s => s.section_code === savedSec);
+                if (secObj) {
+                    populateCascadeCareers(secObj.career, secObj.semester, secObj.section_code);
+                }
+            }
+
+            // Cargar inscripciones previas
+            if (typeof DB !== 'undefined' && DB.getStudentEnrollments) {
+                try {
+                    const enrollments = await DB.getStudentEnrollments(normCi);
+                    if (Array.isArray(enrollments) && enrollments.length > 0) {
+                        const enrolledIds = enrollments.map(e => e.subject_id || e);
+                        localStorage.setItem(LS.enrolled, JSON.stringify(enrolledIds));
+                    }
+                } catch (e) {}
+            }
+        } else {
+            if (noticeEl) noticeEl.style.display = 'none';
+            if (pinWrap) pinWrap.style.display = 'none';
+        }
+    }
+
+    async function submitOnboardingStep1() {
+        const ciInput = document.getElementById('obInputCi');
+        const nameInput = document.getElementById('obInputName');
+        const pinInput = document.getElementById('obInputPin');
+        const carSelect = document.getElementById('obSelectCareer');
+        const semSelect = document.getElementById('obSelectSemester');
+        const secSelect = document.getElementById('obSelectSection');
+        const errEl = document.getElementById('obStep1Error');
+
+        if (errEl) errEl.style.display = 'none';
+
+        const rawCi = ciInput ? ciInput.value.trim() : '';
+        const normCi = normalizeCi(rawCi);
+        const fullName = nameInput ? nameInput.value.trim() : '';
+        const career = carSelect ? carSelect.value.trim() : '';
+        const semester = semSelect ? semSelect.value.trim() : '';
+        const sectionCode = secSelect ? secSelect.value.trim().toUpperCase() : '';
+
+        if (!normCi || normCi.length < 5) {
+            showObError('Por favor ingresa un número de Cédula válido (Ej: 28123456 o V-28123456).');
             return;
         }
 
-        if (student.pin) {
-            if (!pin) {
-                showIdError('Esta Cédula tiene un PIN de seguridad asignado. Por favor ingrésalo.');
-                const pinWrap = document.getElementById('existingPinWrap');
-                if (pinWrap) pinWrap.style.display = 'block';
+        if (!fullName || fullName.length < 3) {
+            showObError('Por favor ingresa tu Nombre Completo.');
+            return;
+        }
+
+        if (!career) {
+            showObError('Por favor selecciona tu Carrera.');
+            return;
+        }
+
+        if (!semester) {
+            showObError('Por favor selecciona tu Semestre.');
+            return;
+        }
+
+        if (!sectionCode) {
+            showObError('Por favor selecciona tu Código de Sección.');
+            return;
+        }
+
+        // Comprobar PIN si el perfil existe y tiene PIN
+        let existingStudent = null;
+        if (typeof DB !== 'undefined' && DB.getStudentByCi) {
+            existingStudent = await DB.getStudentByCi(normCi);
+        }
+        if (existingStudent && existingStudent.pin) {
+            const enteredPin = pinInput ? pinInput.value.trim() : '';
+            if (!enteredPin) {
+                showObError('Esta cédula tiene un PIN de protección asignado. Ingrésalo para continuar.');
+                document.getElementById('obPinWrap').style.display = 'block';
                 return;
             }
-            if (String(pin).trim() !== String(student.pin).trim()) {
-                showIdError('PIN incorrecto para esta Cédula.');
+            if (String(enteredPin) !== String(existingStudent.pin).trim()) {
+                showObError('El PIN ingresado es incorrecto para esta Cédula.');
                 return;
             }
         }
 
         const profileData = {
-            ci: student.ci || formattedCi,
-            fullName: student.full_name || student.fullName || 'Estudiante',
-            career: student.career || 'INGENIERÍA DE SISTEMAS',
-            sectionCode: student.section_code || student.sectionCode || '08S-2623-D1',
-            pin: student.pin || null
+            ci: normCi,
+            fullName,
+            career,
+            semester,
+            sectionCode,
+            pin: existingStudent?.pin || null
         };
+
         saveProfile(profileData);
 
-        if (typeof DB !== 'undefined' && DB.getStudentEnrollments) {
-            try {
-                const enrollments = await DB.getStudentEnrollments(formattedCi);
-                if (Array.isArray(enrollments)) {
-                    const enrolledIds = enrollments.map(e => e.subject_id || e);
-                    localStorage.setItem(LS.enrolled, JSON.stringify(enrolledIds));
-                }
-            } catch (e) {
-                console.warn('[Student] Error recuperando inscripciones:', e);
-            }
+        // Guardar en Supabase en segundo plano
+        if (typeof DB !== 'undefined' && DB.saveStudent) {
+            DB.saveStudent(profileData).catch(() => {});
         }
 
-        closeIdentificationModal(true);
-        _refreshAllAppViews();
-
-        const count = getEnrolledSubjectIds().length;
-        if (typeof Notify !== 'undefined') {
-            Notify.toast(`Perfil recuperado [${profileData.fullName}]. Se cargaron ${count} materias inscritas.`, 'success', 3500);
+        // Actualizar datos de configuración de sección activa
+        if (typeof DB !== 'undefined' && DB.saveSettings) {
+            DB.saveSettings({
+                carrera: career,
+                semestre: semester,
+                seccion: sectionCode,
+                periodo: '2026-I (Diurno)'
+            }).catch(() => {});
         }
+
+        // Transición visual a Paso 2
+        const step1 = document.getElementById('onboardingStep1');
+        const step2 = document.getElementById('onboardingStep2');
+        const pill1 = document.getElementById('obStepPill1');
+        const pill2 = document.getElementById('obStepPill2');
+
+        if (step1) step1.style.display = 'none';
+        if (step2) step2.style.display = 'block';
+        if (pill1) { pill1.classList.remove('active'); pill1.classList.add('done'); }
+        if (pill2) { pill2.classList.add('active'); }
+
+        renderOnboardingStep2();
     }
 
-    function showIdError(msg) {
-        const errEl = document.getElementById('studentLoginErrorMsg');
+    function showObError(msg) {
+        const errEl = document.getElementById('obStep1Error');
         if (errEl) {
             errEl.textContent = msg;
             errEl.style.display = 'block';
+        } else if (typeof Notify !== 'undefined') {
+            Notify.toast(msg, 'error');
         }
     }
 
-    function logoutStudent() {
-        if (!confirm('¿Deseas cambiar de perfil o cerrar sesión de estudiante?')) return;
-        localStorage.removeItem(LS.profile);
-        localStorage.removeItem(LS.enrolled);
+    /* ── PASO 2 DEL ONBOARDING: INSCRIPCIÓN DE MATERIAS ─────── */
+    let _obSearchQuery = '';
+    let _obSelectedPreviewId = null;
+
+    function renderOnboardingStep2() {
+        const p = getProfile();
+        const secCode = (p?.sectionCode || '08S-2623-D1').trim().toUpperCase();
+        const secLabel = document.getElementById('obStep2SectionLabel');
+        const countLabel = document.getElementById('obStep2CountLabel');
+        const enrolledCount = getEnrolledSubjectIds().length;
+
+        if (secLabel) secLabel.textContent = secCode;
+        if (countLabel) countLabel.textContent = `${enrolledCount} materias`;
+
+        const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
+            ? Schedule.getAllCatalogSubjects()
+            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+
+        const listContainer = document.getElementById('obSubjectsListContainer');
+        if (!listContainer) return;
+
+        let displayList = [];
+        const isSearch = _obSearchQuery.length > 0;
+
+        if (isSearch) {
+            const q = _obSearchQuery.trim().toUpperCase();
+            displayList = catalog.filter(s => {
+                const code = (s.code || s.subject_code || '').trim().toUpperCase();
+                const short = (s.shortName || '').trim().toUpperCase();
+                const name = (s.name || '').trim().toUpperCase();
+                const id = (s.id || '').trim().toUpperCase();
+                return code.includes(q) || short.includes(q) || name.includes(q) || id.includes(q);
+            });
+            const titleEl = document.getElementById('obListHeaderTitle');
+            if (titleEl) titleEl.textContent = `Resultados para "${_obSearchQuery}" (${displayList.length})`;
+        } else {
+            // Recomendadas para la sección seleccionada
+            displayList = catalog.filter(s => {
+                const sSec = (s.section || s.section_code || '').trim().toUpperCase();
+                return sSec === secCode || (s.code && s.code.includes(secCode.slice(0, 3)));
+            });
+            const titleEl = document.getElementById('obListHeaderTitle');
+            if (titleEl) titleEl.textContent = `Recomendadas para Sección ${secCode} (${displayList.length})`;
+        }
+
+        if (displayList.length === 0) {
+            listContainer.innerHTML = `<p class="empty-msg" style="padding:24px 12px;text-align:center;">
+                ${isSearch ? 'No se encontraron materias con ese código.' : 'No hay materias registradas para tu sección.'}
+            </p>`;
+        } else {
+            listContainer.innerHTML = displayList.map(s => {
+                const isEnrolled = isSubjectEnrolled(s.id);
+                const isSelected = _obSelectedPreviewId === s.id;
+                const conflictCheck = isEnrolled ? { hasConflict: false } : checkScheduleConflict(s);
+
+                let badgeHtml = '<span class="enroll-badge available">[DISPONIBLE]</span>';
+                if (isEnrolled) {
+                    badgeHtml = '<span class="enroll-badge enrolled">[INSCRITA]</span>';
+                } else if (conflictCheck.hasConflict) {
+                    badgeHtml = '<span class="enroll-badge conflict">[CHOQUE]</span>';
+                }
+
+                return `
+                <div class="enroll-item-card ${isSelected ? 'selected' : ''}" onclick="Student.selectObSubjectForPreview('${s.id}')">
+                    <div class="enroll-item-header">
+                        <span class="mono" style="font-weight:700;color:var(--cyan);font-size:0.75rem;">${s.code || s.shortName || 'MAT'}</span>
+                        ${badgeHtml}
+                    </div>
+                    <div class="enroll-item-title">${s.name}</div>
+                    <div class="enroll-item-sub">
+                        <span>Docente: ${s.teacher || 'Por asignar'}</span>
+                        <span>· Aula: ${s.room || 'Aula N/A'}</span>
+                    </div>
+                    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px;">
+                        ${isEnrolled
+                            ? `<button type="button" class="btn-ghost btn-sm text-danger" onclick="event.stopPropagation();Student.unenrollSubject('${s.id}', this)">Retirar</button>`
+                            : `<button type="button" class="btn-primary btn-sm" onclick="event.stopPropagation();Student.enrollSubject('${s.id}', this)">Inscribir</button>`
+                        }
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Si no hay preview seleccionado, elegir el primero
+        if (!_obSelectedPreviewId && displayList.length > 0) {
+            _obSelectedPreviewId = displayList[0].id;
+        }
+        if (_obSelectedPreviewId) {
+            renderObPreview(_obSelectedPreviewId);
+        }
+    }
+
+    function onObSearchInput(query) {
+        _obSearchQuery = (query || '').trim().toUpperCase();
+        renderOnboardingStep2();
+    }
+
+    function selectObSubjectForPreview(subjectId) {
+        _obSelectedPreviewId = subjectId;
+        renderOnboardingStep2();
+    }
+
+    function renderObPreview(subjectId) {
+        const previewEl = document.getElementById('obPreviewContainer');
+        if (!previewEl) return;
+
+        const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
+            ? Schedule.getAllCatalogSubjects()
+            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+
+        const s = catalog.find(sub => sub.id === subjectId);
+        if (!s) {
+            previewEl.innerHTML = '<p class="empty-msg" style="padding:24px;text-align:center;">Selecciona una materia para ver su detalle.</p>';
+            return;
+        }
+
+        const isEnrolled = isSubjectEnrolled(s.id);
+        const conflictCheck = isEnrolled ? { hasConflict: false, conflicts: [] } : checkScheduleConflict(s);
+        const slots = parseScheduleBlocks(s.slots || s.schedule_blocks);
+        const allActs = (typeof DB !== 'undefined' ? DB.get('activities') : []) || [];
+        const activities = (allActs || []).filter(a => a && a.subjectId === s.id);
+
+        let conflictHtml = '';
+        if (conflictCheck.hasConflict) {
+            conflictHtml = `
+                <div class="conflict-alert-box">
+                    <div class="conflict-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        [CHOQUE DE HORARIO DETECTADO]
+                    </div>
+                    <div>Esta asignatura coincide en horario con materias que ya inscribiste:</div>
+                    ${conflictCheck.conflicts.map(c => `
+                        <div class="conflict-item">• <b>${c.dayName}</b> con <b>${c.conflictingSubject.name}</b> (${c.conflictingSubject.code || ''})</div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            conflictHtml = `
+                <div class="free-slot-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
+                    [HORARIO DISPONIBLE] Sin choques con tus materias inscritas.
+                </div>
+            `;
+        }
+
+        const slotsHtml = slots.length > 0
+            ? slots.map(sl => {
+                const dayName = DAY_NAMES[sl.day] || `Día ${sl.day}`;
+                return `<span class="slot-pill">${dayName}: Bloque ${sl.startBlock} (${sl.span * 45} min)</span>`;
+            }).join('')
+            : '<span style="font-size:0.72rem;color:var(--text-3);">Sin bloques definidos</span>';
+
+        let activitiesHtml = '';
+        if (activities.length === 0) {
+            activitiesHtml = '<p class="empty-msg" style="padding:10px 0;font-size:0.74rem;">Sin actividades programadas actualmente en esta materia.</p>';
+        } else {
+            activitiesHtml = activities.map(a => `
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg-darkest);border:1px solid var(--border);border-radius:6px;font-size:0.74rem;margin-bottom:6px;">
+                    <div>
+                        <div style="font-weight:600;color:var(--text-1);">${a.title}</div>
+                        <div style="font-size:0.65rem;color:var(--text-3);">Corte ${a.corte || 1} · Fecha: ${a.date || 'Sin fecha'}</div>
+                    </div>
+                    <span class="mono" style="font-weight:700;color:var(--yellow);font-size:0.72rem;">${a.weight || 0}%</span>
+                </div>
+            `).join('');
+        }
+
+        previewEl.innerHTML = `
+            <div class="preview-header-wrap">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <span class="mono preview-code-tag">${s.code || s.shortName || 'MAT'}</span>
+                    <span style="font-size:0.72rem;color:var(--text-3);">Sección: <b class="mono" style="color:var(--cyan);">${s.section || '08S-2623-D1'}</b></span>
+                </div>
+                <h3 class="preview-title">${s.name}</h3>
+                <div class="preview-meta">
+                    <span>Docente: <b>${s.teacher || 'Por asignar'}</b></span>
+                    <span>Aula: <b>${s.room || 'Aula N/A'}</b></span>
+                </div>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <div class="preview-sec-label">Bloques de Horario</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+                    ${slotsHtml}
+                </div>
+            </div>
+
+            ${conflictHtml}
+
+            <div style="margin-top:14px;margin-bottom:16px;">
+                <div class="preview-sec-label" style="display:flex;justify-content:space-between;">
+                    <span>Evaluaciones Programadas</span>
+                    <span class="mono" style="font-size:0.7rem;color:var(--text-3);">${activities.length} total</span>
+                </div>
+                <div style="margin-top:8px;">
+                    ${activitiesHtml}
+                </div>
+            </div>
+
+            <div class="preview-action-row">
+                ${isEnrolled
+                    ? `<button type="button" class="btn-ghost text-danger" style="width:100%;justify-content:center;" onclick="Student.unenrollSubject('${s.id}', this)">
+                           Retirar Materia del Horario
+                       </button>`
+                    : `<button type="button" class="btn-primary" style="width:100%;justify-content:center;" onclick="Student.enrollSubject('${s.id}', this)">
+                           Inscribir Materia en Mi Horario
+                       </button>`
+                }
+            </div>
+        `;
+    }
+
+    async function enrollAllSectionSubjects() {
+        const btn = document.getElementById('btnBatchEnrollSection');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Inscribiendo...';
+        }
+
+        const profile = getProfile();
+        const secCode = (profile?.sectionCode || '08S-2623-D1').trim().toUpperCase();
+        const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
+            ? Schedule.getAllCatalogSubjects()
+            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+
+        const sectionSubjects = catalog.filter(s => {
+            const sSec = (s.section || s.section_code || '').trim().toUpperCase();
+            return sSec === secCode || (s.code && s.code.includes(secCode.slice(0, 3)));
+        });
+
+        if (sectionSubjects.length === 0) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Inscribir todas las de mi sección'; }
+            if (typeof Notify !== 'undefined') Notify.toast('No se encontraron materias para tu sección.', 'warning');
+            return;
+        }
+
+        const ids = getEnrolledSubjectIds();
+        let addedCount = 0;
+
+        for (const subj of sectionSubjects) {
+            if (!ids.includes(subj.id)) {
+                ids.push(subj.id);
+                addedCount++;
+                if (profile && profile.ci && typeof DB !== 'undefined' && DB.enrollStudentSubject) {
+                    DB.enrollStudentSubject(profile.ci, subj).catch(() => {});
+                }
+            }
+        }
+
+        localStorage.setItem(LS.enrolled, JSON.stringify(ids));
+        _refreshAllAppViews();
+        renderOnboardingStep2();
+        renderEnrollModal();
+
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Inscribir todas las de mi sección';
+        }
+
+        if (typeof Notify !== 'undefined') {
+            Notify.toast(`Se inscribieron ${addedCount} materias de tu sección con éxito.`, 'success', 3500);
+        }
+    }
+
+    function finishOnboarding() {
+        document.body.classList.remove('app-locked');
+        document.body.style.overflow = '';
+        const obScreen = document.getElementById('onboardingContainer');
+        if (obScreen) obScreen.style.display = 'none';
+
         updateHeaderProfile();
         _refreshAllAppViews();
-        openIdentificationModal();
-    }
 
-    function _refreshAllAppViews() {
-        if (typeof Schedule !== 'undefined') {
-            Schedule.renderTable();
-            Schedule.renderLegend();
-            Schedule.populateSubjectSelects();
-        }
-        if (typeof App !== 'undefined') {
-            App.renderDashboard();
-            if (App.currentTab === 'grades') renderGradesTab();
-        }
-        if (typeof Activities !== 'undefined') {
-            Activities.renderTimeline();
-            Activities.renderCalendar();
+        const p = getProfile();
+        const enrolledCount = getEnrolledSubjectIds().length;
+        if (typeof Notify !== 'undefined') {
+            Notify.toast(`¡Bienvenido, ${p?.fullName || 'Estudiante'}! Has ingresado con ${enrolledCount} materias inscritas.`, 'success', 4000);
         }
     }
 
     /* ══════════════════════════════════════════════════════════
-       5. INSCRIPCIÓN DE MATERIAS, BÚSQUEDA Y DETECCIÓN DE CHOQUES
+       5. INSCRIPCIÓN Y RETIRO REACTIVO (MODAL DENTRO DE LA APP)
     ═══════════════════════════════════════════════════════════ */
+    let _isEnrollActionPending = false;
     let _selectedPreviewSubjectId = null;
     let _enrollFilter = 'section'; // 'section' | 'all' | 'enrolled'
     let _enrollSearchQuery = '';
@@ -1127,20 +1568,22 @@ const Student = (() => {
     }
 
     function checkScheduleConflict(subjectToTest) {
-        if (!subjectToTest || !subjectToTest.slots || !Array.isArray(subjectToTest.slots)) {
+        const slotsA = parseScheduleBlocks(subjectToTest?.slots || subjectToTest?.schedule_blocks);
+        if (slotsA.length === 0) {
             return { hasConflict: false, conflicts: [] };
         }
 
         const enrolled = getEnrolledSubjects().filter(s => s.id !== subjectToTest.id);
         const conflicts = [];
 
-        subjectToTest.slots.forEach(slotA => {
+        slotsA.forEach(slotA => {
             const dayA = slotA.day;
             const startA = slotA.startBlock;
             const endA = startA + slotA.span - 1;
 
             enrolled.forEach(otherSubj => {
-                (otherSubj.slots || []).forEach(slotB => {
+                const slotsB = parseScheduleBlocks(otherSubj.slots || otherSubj.schedule_blocks);
+                slotsB.forEach(slotB => {
                     if (slotB.day === dayA) {
                         const startB = slotB.startBlock;
                         const endB = startB + slotB.span - 1;
@@ -1165,81 +1608,126 @@ const Student = (() => {
         };
     }
 
-    async function enrollSubject(subjectId) {
-        if (!subjectId) return;
-        const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
-            ? Schedule.getAllCatalogSubjects()
-            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+    async function enrollSubject(subjectId, btn = null) {
+        if (!subjectId || _isEnrollActionPending) return;
+        _isEnrollActionPending = true;
 
-        const subj = catalog.find(s => s.id === subjectId);
-        if (!subj) return;
+        let origText = '';
+        if (btn) {
+            btn.disabled = true;
+            origText = btn.innerHTML;
+            btn.textContent = 'Procesando...';
+        }
 
-        const conflictCheck = checkScheduleConflict(subj);
-        if (conflictCheck.hasConflict) {
-            const firstConflict = conflictCheck.conflicts[0];
-            const msg = `[CHOQUE DE HORARIO DETECTADO]\n` +
-                        `Esta materia choca el ${firstConflict.dayName} con:\n` +
-                        `• ${firstConflict.conflictingSubject.name} (${firstConflict.conflictingSubject.code || ''})\n\n` +
-                        `¿Deseas inscribirla de todas formas?`;
-            if (!confirm(msg)) {
-                return;
+        try {
+            const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
+                ? Schedule.getAllCatalogSubjects()
+                : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+
+            const subj = catalog.find(s => s.id === subjectId);
+            if (!subj) return;
+
+            const conflictCheck = checkScheduleConflict(subj);
+            if (conflictCheck.hasConflict) {
+                const firstConflict = conflictCheck.conflicts[0];
+                const msg = `[CHOQUE DE HORARIO DETECTADO]\n` +
+                            `Esta materia choca el ${firstConflict.dayName} con:\n` +
+                            `• ${firstConflict.conflictingSubject.name} (${firstConflict.conflictingSubject.code || ''})\n\n` +
+                            `¿Deseas inscribirla de todas formas?`;
+                if (!confirm(msg)) {
+                    return;
+                }
             }
-        }
 
-        const ids = getEnrolledSubjectIds();
-        if (!ids.includes(subjectId)) {
-            ids.push(subjectId);
-            localStorage.setItem(LS.enrolled, JSON.stringify(ids));
-        }
-
-        const profile = getProfile();
-        if (profile && profile.ci && typeof DB !== 'undefined' && DB.enrollStudentSubject) {
-            try {
-                await DB.enrollStudentSubject(profile.ci, subj);
-            } catch (e) {
-                console.warn('[Student] Error guardando inscripción en Supabase:', e);
+            const ids = getEnrolledSubjectIds();
+            if (!ids.includes(subjectId)) {
+                ids.push(subjectId);
+                localStorage.setItem(LS.enrolled, JSON.stringify(ids));
             }
-        }
 
-        _refreshAllAppViews();
-        renderEnrollModal();
+            const profile = getProfile();
+            if (profile && profile.ci && typeof DB !== 'undefined' && DB.enrollStudentSubject) {
+                DB.enrollStudentSubject(profile.ci, subj).catch(() => {});
+            }
 
-        if (typeof Notify !== 'undefined') {
-            Notify.toast(`Materia inscrita: [${subj.code || subj.shortName || subj.id}] ${subj.name}`, 'success', 3000);
+            _refreshAllAppViews();
+            renderEnrollModal();
+            renderOnboardingStep2();
+
+            if (typeof Notify !== 'undefined') {
+                Notify.toast(`Materia inscrita: [${subj.code || subj.shortName || subj.id}] ${subj.name}`, 'success', 3000);
+            }
+        } finally {
+            _isEnrollActionPending = false;
+            if (btn) {
+                btn.disabled = false;
+            }
         }
     }
 
-    async function unenrollSubject(subjectId) {
-        if (!subjectId) return;
-        const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
-            ? Schedule.getAllCatalogSubjects()
-            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+    async function unenrollSubject(subjectId, btn = null) {
+        if (!subjectId || _isEnrollActionPending) return;
+        _isEnrollActionPending = true;
 
-        const subj = catalog.find(s => s.id === subjectId);
-        const name = subj ? subj.name : subjectId;
-
-        if (!confirm(`¿Estás seguro de retirar la materia "${name}" de tu horario?`)) {
-            return;
+        let origText = '';
+        if (btn) {
+            btn.disabled = true;
+            origText = btn.innerHTML;
+            btn.textContent = 'Procesando...';
         }
 
-        let ids = getEnrolledSubjectIds();
-        ids = ids.filter(id => id !== subjectId);
-        localStorage.setItem(LS.enrolled, JSON.stringify(ids));
+        try {
+            const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
+                ? Schedule.getAllCatalogSubjects()
+                : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
 
-        const profile = getProfile();
-        if (profile && profile.ci && typeof DB !== 'undefined' && DB.unenrollStudentSubject) {
-            try {
-                await DB.unenrollStudentSubject(profile.ci, subjectId);
-            } catch (e) {
-                console.warn('[Student] Error retirando en Supabase:', e);
+            const subj = catalog.find(s => s.id === subjectId);
+            const name = subj ? subj.name : subjectId;
+
+            if (!confirm(`¿Estás seguro de retirar la materia "${name}" de tu horario?`)) {
+                return;
+            }
+
+            let ids = getEnrolledSubjectIds();
+            ids = ids.filter(id => id !== subjectId);
+            localStorage.setItem(LS.enrolled, JSON.stringify(ids));
+
+            const profile = getProfile();
+            if (profile && profile.ci && typeof DB !== 'undefined' && DB.unenrollStudentSubject) {
+                DB.unenrollStudentSubject(profile.ci, subjectId).catch(() => {});
+            }
+
+            _refreshAllAppViews();
+            renderEnrollModal();
+            renderOnboardingStep2();
+
+            if (typeof Notify !== 'undefined') {
+                Notify.toast('Materia retirada de tu horario', 'info', 2500);
+            }
+        } finally {
+            _isEnrollActionPending = false;
+            if (btn) {
+                btn.disabled = false;
             }
         }
+    }
 
-        _refreshAllAppViews();
-        renderEnrollModal();
-
-        if (typeof Notify !== 'undefined') {
-            Notify.toast('Materia retirada de tu horario', 'info', 2500);
+    function _refreshAllAppViews() {
+        if (typeof Schedule !== 'undefined') {
+            Schedule.renderTable();
+            Schedule.renderLegend();
+            Schedule.populateSubjectSelects();
+        }
+        if (typeof App !== 'undefined') {
+            App.renderDashboard();
+        }
+        renderGradesTab();
+        if (typeof Activities !== 'undefined') {
+            Activities.renderTimeline();
+            Activities.renderCalendar();
+        }
+        if (window.lucide) {
+            lucide.createIcons();
         }
     }
 
@@ -1247,20 +1735,23 @@ const Student = (() => {
         const modal = document.getElementById('modalEnrollment');
         if (!modal) return;
 
-        _enrollSearchQuery = searchQuery || '';
+        _enrollSearchQuery = (searchQuery || '').trim().toUpperCase();
         const searchInput = document.getElementById('inputEnrollSearch');
         if (searchInput) searchInput.value = _enrollSearchQuery;
 
         modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
         renderEnrollModal();
     }
 
     function closeEnrollModal() {
-        document.getElementById('modalEnrollment')?.classList.remove('open');
+        const modal = document.getElementById('modalEnrollment');
+        if (modal) modal.classList.remove('open');
+        document.body.style.overflow = '';
     }
 
     function onEnrollSearch(query) {
-        _enrollSearchQuery = (query || '').trim().toLowerCase();
+        _enrollSearchQuery = (query || '').trim().toUpperCase();
         renderEnrollSubjectsList();
     }
 
@@ -1278,15 +1769,15 @@ const Student = (() => {
         renderEnrollPreview(subjectId);
     }
 
-    function enrollSelectedSubject() {
+    function enrollSelectedSubject(btn = null) {
         if (_selectedPreviewSubjectId) {
-            enrollSubject(_selectedPreviewSubjectId);
+            enrollSubject(_selectedPreviewSubjectId, btn);
         }
     }
 
-    function unenrollSelectedSubject() {
+    function unenrollSelectedSubject(btn = null) {
         if (_selectedPreviewSubjectId) {
-            unenrollSubject(_selectedPreviewSubjectId);
+            unenrollSubject(_selectedPreviewSubjectId, btn);
         }
     }
 
@@ -1295,6 +1786,12 @@ const Student = (() => {
         const enrolledCount = getEnrolledSubjectIds().length;
         if (countBadge) {
             countBadge.textContent = `${enrolledCount} Materias Inscritas`;
+        }
+
+        const p = getProfile();
+        const badgeSec = document.getElementById('enrollBadgeSection');
+        if (badgeSec && p && p.sectionCode) {
+            badgeSec.textContent = p.sectionCode;
         }
 
         renderEnrollSubjectsList();
@@ -1318,63 +1815,64 @@ const Student = (() => {
 
         const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
             ? Schedule.getAllCatalogSubjects()
-            : [];
+            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+
+        const enrolledIds = getEnrolledSubjectIds();
         const profile = getProfile();
-        const studentSection = (profile?.sectionCode || '08S-2623-D1').toUpperCase();
+        const userSection = (profile?.sectionCode || '08S-2623-D1').trim().toUpperCase();
 
-        let list = catalog;
+        let filtered = catalog;
 
-        // Filtro por categoría
-        if (_enrollFilter === 'section') {
-            list = list.filter(s => (s.section || '08S-2623-D1').toUpperCase() === studentSection);
-        } else if (_enrollFilter === 'enrolled') {
-            list = list.filter(s => isSubjectEnrolled(s.id));
-        }
-
-        // Filtro por texto de búsqueda
-        if (_enrollSearchQuery) {
-            list = list.filter(s => {
-                const code = (s.code || '').toLowerCase();
-                const short = (s.shortName || '').toLowerCase();
-                const name = (s.name || '').toLowerCase();
-                const teacher = (s.teacher || '').toLowerCase();
-                return code.includes(_enrollSearchQuery) ||
-                       short.includes(_enrollSearchQuery) ||
-                       name.includes(_enrollSearchQuery) ||
-                       teacher.includes(_enrollSearchQuery);
+        // Filtro por chips
+        if (_enrollFilter === 'enrolled') {
+            filtered = filtered.filter(s => enrolledIds.includes(s.id));
+        } else if (_enrollFilter === 'section') {
+            filtered = filtered.filter(s => {
+                const sSec = (s.section || s.section_code || '').trim().toUpperCase();
+                return sSec === userSection || (s.code && s.code.includes(userSection.slice(0, 3)));
             });
         }
 
-        if (list.length === 0) {
-            listEl.innerHTML = '<p class="empty-msg" style="padding:24px 12px;font-size:0.78rem;">No se encontraron materias con ese criterio de búsqueda.</p>';
+        // Filtro por buscador (tolerante a mayúsculas/minúsculas y espacios)
+        if (_enrollSearchQuery.length > 0) {
+            const q = _enrollSearchQuery;
+            filtered = filtered.filter(s => {
+                const code = (s.code || s.subject_code || '').trim().toUpperCase();
+                const short = (s.shortName || '').trim().toUpperCase();
+                const name = (s.name || '').trim().toUpperCase();
+                const id = (s.id || '').trim().toUpperCase();
+                return code.includes(q) || short.includes(q) || name.includes(q) || id.includes(q);
+            });
+        }
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<p class="empty-msg" style="padding:24px;text-align:center;">No se encontraron materias disponibles.</p>';
             return;
         }
 
-        listEl.innerHTML = list.map(s => {
-            const isEnrolled = isSubjectEnrolled(s.id);
-            const isSelected = s.id === _selectedPreviewSubjectId;
+        listEl.innerHTML = filtered.map(s => {
+            const isEnrolled = enrolledIds.includes(s.id);
+            const isSelected = _selectedPreviewSubjectId === s.id;
             const conflictCheck = isEnrolled ? { hasConflict: false } : checkScheduleConflict(s);
 
-            let statusPill = isEnrolled
-                ? '<span class="enroll-badge enrolled">[INSCRITA]</span>'
-                : '<span class="enroll-badge available">[DISPONIBLE]</span>';
-
-            if (!isEnrolled && conflictCheck.hasConflict) {
-                statusPill = '<span class="enroll-badge conflict">[CHOQUE]</span> ' + statusPill;
+            let badgeHtml = '<span class="enroll-badge available">[DISPONIBLE]</span>';
+            if (isEnrolled) {
+                badgeHtml = '<span class="enroll-badge enrolled">[INSCRITA]</span>';
+            } else if (conflictCheck.hasConflict) {
+                badgeHtml = '<span class="enroll-badge conflict">[CHOQUE]</span>';
             }
 
             return `
-            <div class="enroll-item-card ${isSelected ? 'selected' : ''}" onclick="Student.selectSubjectForPreview('${s.id}')"
-                 style="border-left-color: ${s.color || 'var(--cyan)'};">
-                <div style="flex:1;min-width:0;">
-                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-                        <span class="mono" style="font-weight:700;color:var(--cyan);font-size:0.76rem;">${s.code || s.shortName || 'MAT'}</span>
-                        <span style="font-size:0.65rem;color:var(--text-3);">· ${s.section || '08S-2623-D1'}</span>
-                    </div>
-                    <div class="enroll-item-name">${s.name}</div>
-                    <div style="font-size:0.68rem;color:var(--text-3);">${s.teacher || 'Docente por asignar'} ${s.room ? `· ${s.room}` : ''}</div>
+            <div class="enroll-item-card ${isSelected ? 'selected' : ''}" onclick="Student.selectSubjectForPreview('${s.id}')">
+                <div class="enroll-item-header">
+                    <span class="mono" style="font-weight:700;color:var(--cyan);font-size:0.75rem;">${s.code || s.shortName || 'MAT'}</span>
+                    ${badgeHtml}
                 </div>
-                <div>${statusPill}</div>
+                <div class="enroll-item-title">${s.name}</div>
+                <div class="enroll-item-sub">
+                    <span>Docente: ${s.teacher || 'Por asignar'}</span>
+                    <span>· Aula: ${s.room || 'Aula N/A'}</span>
+                </div>
             </div>`;
         }).join('');
     }
@@ -1385,47 +1883,49 @@ const Student = (() => {
 
         const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
             ? Schedule.getAllCatalogSubjects()
-            : [];
-        const s = catalog.find(sub => sub.id === subjectId);
+            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
 
+        const s = catalog.find(sub => sub.id === subjectId);
         if (!s) {
-            previewEl.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-3);font-size:0.8rem;">Selecciona una materia para ver su información detallada.</div>';
+            previewEl.innerHTML = '<p class="empty-msg" style="padding:24px;text-align:center;">Selecciona una materia para ver su detalle.</p>';
             return;
         }
 
         const isEnrolled = isSubjectEnrolled(s.id);
         const conflictCheck = isEnrolled ? { hasConflict: false, conflicts: [] } : checkScheduleConflict(s);
-        const activities = (typeof DB !== 'undefined' ? DB.get('activities') : []).filter(a => a.subjectId === s.id);
+        const slots = parseScheduleBlocks(s.slots || s.schedule_blocks);
+        const allActs = (typeof DB !== 'undefined' ? DB.get('activities') : []) || [];
+        const activities = (allActs || []).filter(a => a && a.subjectId === s.id);
 
         let conflictHtml = '';
-        if (!isEnrolled) {
-            if (conflictCheck.hasConflict) {
-                const conflictList = conflictCheck.conflicts.map(c =>
-                    `• <b>${c.dayName}</b>: Coincide con <b>${c.conflictingSubject.name}</b> (${c.conflictingSubject.code || ''})`
-                ).join('<br>');
-                conflictHtml = `
-                    <div class="conflict-alert-box">
-                        <div style="font-weight:700;color:var(--red);margin-bottom:4px;display:flex;align-items:center;gap:6px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="15" height="15"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                            [CHOQUE DE HORARIO DETECTADO]
-                        </div>
-                        <div style="font-size:0.75rem;line-height:1.4;">${conflictList}</div>
+        if (conflictCheck.hasConflict) {
+            conflictHtml = `
+                <div class="conflict-alert-box">
+                    <div class="conflict-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        [CHOQUE DE HORARIO DETECTADO]
                     </div>
-                `;
-            } else {
-                conflictHtml = `
-                    <div class="free-slot-box">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
-                        [HORARIO DISPONIBLE] Sin solapamientos con tus materias ya inscritas.
-                    </div>
-                `;
-            }
+                    <div>Esta asignatura coincide en horario con materias que ya inscribiste:</div>
+                    ${conflictCheck.conflicts.map(c => `
+                        <div class="conflict-item">• <b>${c.dayName}</b> con <b>${c.conflictingSubject.name}</b> (${c.conflictingSubject.code || ''})</div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            conflictHtml = `
+                <div class="free-slot-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
+                    [HORARIO DISPONIBLE] Sin choques con tus materias inscritas.
+                </div>
+            `;
         }
 
-        const slotsHtml = (s.slots || []).map(slot => {
-            const dayName = DAY_NAMES[slot.day] || `Día ${slot.day}`;
-            return `<span class="slot-pill">${dayName} · Bloque ${slot.startBlock} (${slot.span} blq)</span>`;
-        }).join('') || '<span style="color:var(--text-3);font-size:0.75rem;">Sin bloques definidos</span>';
+        const slotsHtml = slots.length > 0
+            ? slots.map(sl => {
+                const dayName = DAY_NAMES[sl.day] || `Día ${sl.day}`;
+                return `<span class="slot-pill">${dayName}: Bloque ${sl.startBlock} (${sl.span * 45} min)</span>`;
+            }).join('')
+            : '<span style="font-size:0.72rem;color:var(--text-3);">Sin bloques definidos</span>';
 
         let activitiesHtml = '';
         if (activities.length === 0) {
@@ -1476,15 +1976,35 @@ const Student = (() => {
 
             <div class="preview-action-row">
                 ${isEnrolled
-                    ? `<button type="button" class="btn-ghost text-danger" style="width:100%;justify-content:center;" onclick="Student.unenrollSelectedSubject()">
+                    ? `<button type="button" class="btn-ghost text-danger" style="width:100%;justify-content:center;" onclick="Student.unenrollSelectedSubject(this)">
                            Retirar Materia del Horario
                        </button>`
-                    : `<button type="button" class="btn-primary" style="width:100%;justify-content:center;" onclick="Student.enrollSelectedSubject()">
+                    : `<button type="button" class="btn-primary" style="width:100%;justify-content:center;" onclick="Student.enrollSelectedSubject(this)">
                            Inscribir Materia en Mi Horario
                        </button>`
                 }
             </div>
         `;
+    }
+
+    function logoutStudent() {
+        if (!confirm('¿Deseas cerrar la sesión del estudiante en este dispositivo?')) return;
+        localStorage.removeItem(LS.profile);
+        localStorage.removeItem(LS.enrolled);
+        checkOnboardingLock();
+        _refreshAllAppViews();
+        if (typeof Notify !== 'undefined') Notify.toast('Sesión cerrada correctamente', 'info');
+    }
+
+    function openProfileOrLogout() {
+        const p = getProfile();
+        if (!p) {
+            checkOnboardingLock();
+            return;
+        }
+        if (confirm(`Estudiante: ${p.fullName}\nCédula: ${p.ci}\nCarrera: ${p.career}\nSección: ${p.sectionCode}\n\n¿Deseas cerrar la sesión de estudiante en este dispositivo?`)) {
+            logoutStudent();
+        }
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -1493,9 +2013,7 @@ const Student = (() => {
     function init() {
         updateHeaderProfile();
         renderGradesTab();
-        if (!hasActiveProfile()) {
-            openIdentificationModal();
-        }
+        checkOnboardingLock();
     }
 
     /* ── API PÚBLICA ─────────────────────────────────────────── */
@@ -1523,22 +2041,34 @@ const Student = (() => {
         exportGradesPdf,
         inputToPct,
         pctToDisplay,
-        // Identificación Estudiantil
+        // Identificación Estudiantil y Onboarding
         getProfile,
         hasActiveProfile,
         saveProfile,
         updateHeaderProfile,
-        openIdentificationModal,
-        closeIdentificationModal,
-        switchIdTab,
-        submitNewStudentForm,
-        submitExistingStudentForm,
+        checkOnboardingLock,
+        initOnboardingStep1,
+        populateCascadeCareers,
+        onCascadeCareerChange,
+        onCascadeSemesterChange,
+        onCascadeSectionChange,
+        onCiInput,
+        onCiBlur,
+        submitOnboardingStep1,
+        renderOnboardingStep2,
+        onObSearchInput,
+        selectObSubjectForPreview,
+        enrollAllSectionSubjects,
+        finishOnboarding,
         logoutStudent,
+        openProfileOrLogout,
+        openIdentificationModal: openProfileOrLogout,
         // Inscripción y Horario
         getEnrolledSubjectIds,
         isSubjectEnrolled,
         getEnrolledSubjects,
         checkScheduleConflict,
+        parseScheduleBlocks,
         enrollSubject,
         unenrollSubject,
         openEnrollModal,

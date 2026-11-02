@@ -146,6 +146,9 @@ const Admin = (() => {
                 closePinModal(null, true);
                 Notify.toast(`Bienvenido Administrador (${res.user.email}). Sesión permanente guardada.`, 'success', 3500);
                 updateModeBadge();
+                if (typeof Student !== 'undefined' && Student.checkOnboardingLock) {
+                    Student.checkOnboardingLock();
+                }
 
                 if (_onPinSuccessCallback) {
                     const cb = _onPinSuccessCallback;
@@ -234,6 +237,9 @@ const Admin = (() => {
             DB.unlockAdmin();
             closePinModal(null, true);
             Notify.toast('Acceso local concedido como Administrador', 'success');
+            if (typeof Student !== 'undefined' && Student.checkOnboardingLock) {
+                Student.checkOnboardingLock();
+            }
 
             if (_onPinSuccessCallback) {
                 const cb = _onPinSuccessCallback;
@@ -261,6 +267,9 @@ const Admin = (() => {
         await DB.logoutAdmin();
         closeAdminPanel(null, true);
         updateModeBadge();
+        if (typeof Student !== 'undefined' && Student.checkOnboardingLock) {
+            Student.checkOnboardingLock();
+        }
         Notify.toast('Sesión de administración cerrada', 'info');
     }
 
@@ -571,14 +580,91 @@ const Admin = (() => {
     }
 
     /* ══════════════════════════════════════════════════════════
-       TAB 3: CONFIGURACIÓN SECCIÓN
+       TAB 3: CONFIGURACIÓN SECCIÓN & CATÁLOGO
     ═══════════════════════════════════════════════════════════ */
     function renderSectionSettings() {
         const s = DB.getSettings();
-        document.getElementById('setCarrera').value  = s.carrera || 'INGENIERÍA DE SISTEMAS';
-        document.getElementById('setSemestre').value = s.semestre || 'VIII';
-        document.getElementById('setSeccion').value  = s.seccion || '08S-2623-D1';
-        document.getElementById('setPeriodo').value  = s.periodo || '2026-I (Diurno)';
+        const setC = document.getElementById('setCarrera');
+        const setS = document.getElementById('setSemestre');
+        const setSec = document.getElementById('setSeccion');
+        const setP = document.getElementById('setPeriodo');
+        if (setC) setC.value  = s.carrera || 'INGENIERÍA DE SISTEMAS';
+        if (setS) setS.value = s.semestre || 'VIII';
+        if (setSec) setSec.value  = s.seccion || '08S-2623-D1';
+        if (setP) setP.value  = s.periodo || '2026-I (Diurno)';
+
+        // Render catálogo de secciones
+        const container = document.getElementById('adminSectionsCatalogList');
+        if (container && DB.getSections) {
+            const sections = DB.getSections();
+            if (sections.length === 0) {
+                container.innerHTML = '<p class="empty-msg" style="padding:14px;text-align:center;">No hay secciones registradas</p>';
+            } else {
+                container.innerHTML = sections.map(sec => `
+                    <div class="admin-card-row" style="padding:8px 12px;margin-bottom:6px;align-items:center;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:700;color:var(--text-1);font-size:0.85rem;">
+                                <span class="mono" style="color:var(--cyan);margin-right:6px;">[${sec.section_code}]</span>
+                                ${sec.career} · Semestre ${sec.semester}
+                            </div>
+                            <div style="font-size:0.72rem;color:var(--text-3);margin-top:2px;">
+                                Periodo: ${sec.period || '2026-I (Diurno)'}
+                            </div>
+                        </div>
+                        <div class="admin-row-btns">
+                            <button class="btn-ghost btn-sm text-danger" onclick="Admin.deleteSection('${sec.section_code}')" title="Eliminar Sección">
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    }
+
+    async function createSection() {
+        const careerIn = document.getElementById('newSecCarrera');
+        const semIn = document.getElementById('newSecSemestre');
+        const codeIn = document.getElementById('newSecCode');
+        const perIn = document.getElementById('newSecPeriodo');
+
+        const career = (careerIn?.value || '').trim();
+        const semester = (semIn?.value || '').trim();
+        const section_code = (codeIn?.value || '').trim();
+        const period = (perIn?.value || '').trim() || '2026-I (Diurno)';
+
+        if (!career || !semester || !section_code) {
+            return Notify.toast('Carrera, Semestre y Código de Sección son obligatorios', 'error');
+        }
+
+        try {
+            await DB.saveSection({ career, semester, section_code, period });
+            if (careerIn) careerIn.value = '';
+            if (semIn) semIn.value = '';
+            if (codeIn) codeIn.value = '';
+            renderSectionSettings();
+            if (typeof Student !== 'undefined' && Student.populateCascadeCareers) {
+                Student.populateCascadeCareers();
+            }
+            Notify.toast(`Sección [${section_code.toUpperCase()}] registrada con éxito`, 'success');
+        } catch (e) {
+            Notify.toast('Error registrando sección: ' + e.message, 'error');
+        }
+    }
+
+    async function deleteSection(code) {
+        if (!code) return;
+        if (!confirm(`¿Estás seguro de eliminar la sección [${code}]?`)) return;
+        try {
+            await DB.deleteSection(code);
+            renderSectionSettings();
+            if (typeof Student !== 'undefined' && Student.populateCascadeCareers) {
+                Student.populateCascadeCareers();
+            }
+            Notify.toast(`Sección [${code}] eliminada`, 'info');
+        } catch (e) {
+            Notify.toast('Error eliminando sección: ' + e.message, 'error');
+        }
     }
 
     async function saveSectionSettings() {
@@ -865,6 +951,8 @@ const Admin = (() => {
         // Tab 3
         renderSectionSettings,
         saveSectionSettings,
+        createSection,
+        deleteSection,
         changePin,
         // Tab 4
         renderSystemConfig,

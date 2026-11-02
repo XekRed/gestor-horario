@@ -220,6 +220,19 @@ const Schedule = (() => {
         return all.find(s => s.id === id) || null;
     }
 
+    function _parseSlots(subj) {
+        if (!subj) return [];
+        if (typeof Student !== 'undefined' && Student.parseScheduleBlocks) {
+            return Student.parseScheduleBlocks(subj.slots || subj.schedule_blocks);
+        }
+        const val = subj.slots || subj.schedule_blocks;
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') {
+            try { return JSON.parse(val); } catch (e) { return []; }
+        }
+        return [];
+    }
+
     /* ── CONSTRUCTOR DE GRILLA CON DETECCIÓN DE CHOQUES ───────── */
     // Genera matriz 14x6 donde cada celda define si es vacía, materia única o choque de horario
     function buildGrid() {
@@ -238,7 +251,7 @@ const Schedule = (() => {
 
         // Llenar cobertura
         active.forEach(subj => {
-            (subj.slots || []).forEach(slot => {
+            _parseSlots(subj).forEach(slot => {
                 const { day, startBlock, span } = slot;
                 if (day < 0 || day >= cols) return;
                 for (let k = 0; k < span; k++) {
@@ -581,7 +594,7 @@ const Schedule = (() => {
         document.getElementById('modalCode').textContent = subj.code || '—';
         document.getElementById('modalTeacher').textContent = subj.teacher || 'Por confirmar';
 
-        const totalBlocks = (subj.slots || []).reduce((acc, sl) => acc + sl.span, 0);
+        const totalBlocks = _parseSlots(subj).reduce((acc, sl) => acc + sl.span, 0);
         const totalMins = totalBlocks * 45;
         const hrs = Math.floor(totalMins / 60);
         const mins = totalMins % 60;
@@ -589,7 +602,7 @@ const Schedule = (() => {
 
         const schedList = document.getElementById('modalScheduleList');
         if (schedList) {
-            schedList.innerHTML = (subj.slots || []).map(slot => {
+            schedList.innerHTML = _parseSlots(subj).map(slot => {
                 const startBlock = ALL_BLOCKS[slot.startBlock];
                 const endBlock   = ALL_BLOCKS[slot.startBlock + slot.span - 1];
                 if (!startBlock || !endBlock) return '';
@@ -641,7 +654,7 @@ const Schedule = (() => {
         const active = getActiveSubjects();
         const result = [];
         for (const subj of active) {
-            for (const slot of (subj.slots || [])) {
+            for (const slot of _parseSlots(subj)) {
                 if (slot.day === col) {
                     const startBlock = ALL_BLOCKS[slot.startBlock];
                     const endBlock   = ALL_BLOCKS[slot.startBlock + slot.span - 1];
@@ -677,7 +690,7 @@ const Schedule = (() => {
         let best = null;
 
         for (const subj of active) {
-            for (const slot of (subj.slots || [])) {
+            for (const slot of _parseSlots(subj)) {
                 if (slot.day !== col) continue;
                 const startBlock = ALL_BLOCKS[slot.startBlock];
                 if (!startBlock || !startBlock.start) continue;
