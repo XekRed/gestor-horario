@@ -123,10 +123,10 @@ const Student = (() => {
             return {
                 max: 20,
                 step: 0.1,
-                tag: '/ 20',
+                tag: 'pts',
                 placeholder: '0-20 pts',
                 scaleMax: 20,
-                passingDisplay: '9.60 pts',
+                passingDisplay: '9.6 / 20 pts',
                 label: '20 Puntos',
                 title: 'Nota en escala de 0 a 20 puntos'
             };
@@ -135,23 +135,23 @@ const Student = (() => {
             return {
                 max: 5,
                 step: 0.05,
-                tag: '/ 5',
+                tag: 'pts',
                 placeholder: '0-5 pts',
                 scaleMax: 5,
-                passingDisplay: '2.40 pts',
+                passingDisplay: '2.40 / 5 pts',
                 label: '5 Puntos',
                 title: 'Nota en escala de 0 a 5 puntos'
             };
         }
         return {
-            max: 100,
-            step: 1,
+            max: 25,
+            step: 0.5,
             tag: '%',
-            placeholder: '0-100%',
-            scaleMax: 100,
+            placeholder: '0-25%',
+            scaleMax: 25,
             passingDisplay: '48.0%',
             label: 'Porcentaje %',
-            title: 'Nota en porcentaje (0–100%)'
+            title: 'Nota en porcentaje (0–25% por corte)'
         };
     }
 
@@ -178,6 +178,92 @@ const Student = (() => {
         }
         const dec = decimals !== null ? decimals : 1;
         return num.toFixed(dec);
+    }
+
+    // Convierte el valor del input de un corte al porcentaje interno real del corte (0 a 25%)
+    function inputToCortePct(val, mode) {
+        if (val === null || val === undefined || isNaN(val) || val === '') return null;
+        let num = parseFloat(val);
+        if (isNaN(num)) return null;
+
+        let pct = 0;
+        if (mode === 'scale20') {
+            num = Math.max(0, Math.min(20, num));
+            pct = (num / 20) * 25;
+        } else if (mode === 'scale5') {
+            num = Math.max(0, Math.min(5, num));
+            pct = (num / 5) * 25;
+        } else {
+            num = Math.max(0, Math.min(25, num));
+            pct = num;
+        }
+        return Math.max(0, Math.min(25, parseFloat(pct.toFixed(2))));
+    }
+
+    // Convierte el porcentaje interno del corte (0 a 25%) al valor numérico a mostrar según el modo
+    function cortePctToDisplay(cortePct, mode, decimals = null) {
+        if (cortePct === null || cortePct === undefined || isNaN(cortePct)) return '';
+        const num = Math.max(0, Math.min(25, parseFloat(cortePct)));
+        if (mode === 'scale20') {
+            const dec = decimals !== null ? decimals : 1;
+            return ((num / 25) * 20).toFixed(dec);
+        }
+        if (mode === 'scale5') {
+            const dec = decimals !== null ? decimals : 2;
+            return ((num / 25) * 5).toFixed(dec);
+        }
+        const dec = decimals !== null ? decimals : 1;
+        return num.toFixed(dec);
+    }
+
+    // Convierte el acumulado total de la materia (0 a 100%) al valor de visualización según el modo
+    function totalPctToDisplay(totalPct, mode, decimals = null) {
+        if (totalPct === null || totalPct === undefined || isNaN(totalPct)) return '';
+        const num = Math.max(0, Math.min(100, parseFloat(totalPct)));
+        if (mode === 'scale20') {
+            const dec = decimals !== null ? decimals : 1;
+            return ((num / 100) * 20).toFixed(dec);
+        }
+        if (mode === 'scale5') {
+            const dec = decimals !== null ? decimals : 2;
+            return ((num / 100) * 5).toFixed(dec);
+        }
+        const dec = decimals !== null ? decimals : 1;
+        return num.toFixed(dec);
+    }
+
+    // Validación y tope en tiempo real para inputs de corte
+    function validateCorteInput(inputEl, mode) {
+        if (!inputEl) return;
+        let max = 25;
+        if (mode === 'scale20') max = 20;
+        else if (mode === 'scale5') max = 5;
+
+        const val = parseFloat(inputEl.value);
+        if (!isNaN(val)) {
+            if (val > max) {
+                inputEl.value = max;
+            } else if (val < 0) {
+                inputEl.value = 0;
+            }
+        }
+    }
+
+    // Validación y tope en tiempo real para inputs de actividades individuales
+    function validateActivityInput(inputEl, mode) {
+        if (!inputEl) return;
+        let max = 100;
+        if (mode === 'scale20') max = 20;
+        else if (mode === 'scale5') max = 5;
+
+        const val = parseFloat(inputEl.value);
+        if (!isNaN(val)) {
+            if (val > max) {
+                inputEl.value = max;
+            } else if (val < 0) {
+                inputEl.value = 0;
+            }
+        }
     }
 
     function getActivityGrade(activityId) {
@@ -213,11 +299,12 @@ const Student = (() => {
         if (!store.customCortes[subjectId]) store.customCortes[subjectId] = {};
 
         const mode = getGradeMode();
-        const pct = inputToPct(grade, mode);
+        const pct = inputToCortePct(grade, mode);
         if (pct === null) {
             delete store.customCortes[subjectId][corteNum];
         } else {
-            store.customCortes[subjectId][corteNum] = Math.max(0, Math.min(100, parseFloat(pct.toFixed(2))));
+            // Guarda siempre internamente la nota de cada corte en base a su porcentaje real (0 a 25%)
+            store.customCortes[subjectId][corteNum] = Math.max(0, Math.min(25, parseFloat(pct.toFixed(2))));
         }
 
         saveGradesStore(store);
@@ -261,7 +348,8 @@ const Student = (() => {
                 const customG = getCustomCorteGrade(subjectId, corteNum);
                 if (customG !== null && customG !== undefined && !isNaN(customG)) {
                     evalWeight = 25;
-                    earnedPct = (parseFloat(customG) / 100) * 25;
+                    // Guardado directamente como porcentaje real ganado de ese corte (0 a 25%)
+                    earnedPct = Math.min(25, Math.max(0, parseFloat(customG)));
                 }
             }
 
@@ -522,7 +610,7 @@ const Student = (() => {
             const statusBadge = STATUS_BADGES[m.status] || STATUS_BADGES.in_progress;
 
             let projectionMsg = '';
-            const displayAcum = pctToDisplay(m.totalAcumulado, mode);
+            const displayAcum = totalPctToDisplay(m.totalAcumulado, mode);
             const displayAcumText = mode === 'percentage' ? `${displayAcum}%` : `${displayAcum} pts`;
 
             if (m.status === 'passed') {
@@ -539,15 +627,15 @@ const Student = (() => {
             const cortesHtml = [1, 2, 3, 4].map(corteNum => {
                 const cb = m.corteBreakdown[corteNum];
                 const corteSubtotalPct = cb.earnedPct;
-                const corteSubtotalDisplay = pctToDisplay(corteSubtotalPct, mode);
-                const corteNominalMax = mode === 'percentage' ? '25%' : (mode === 'scale20' ? '5.00 pts' : '1.25 pts');
+                const corteSubtotalDisplay = cortePctToDisplay(corteSubtotalPct, mode);
+                const corteNominalMax = mode === 'percentage' ? '25%' : (mode === 'scale20' ? '20 pts' : '5 pts');
 
                 let actsListHtml = '';
                 if (cb.acts.length > 0) {
                     actsListHtml = cb.acts.map(act => {
                         const gradePct = getActivityGrade(act.id);
                         const displayVal = (gradePct !== null && gradePct !== undefined && gradePct !== '')
-                            ? pctToDisplay(parseFloat(gradePct), mode)
+                            ? (mode === 'scale20' ? ((parseFloat(gradePct) / 100) * 20).toFixed(1) : (mode === 'scale5' ? ((parseFloat(gradePct) / 100) * 5).toFixed(2) : parseFloat(gradePct).toFixed(1)))
                             : '';
                         return `
                         <div class="grade-entry-row">
@@ -556,8 +644,9 @@ const Student = (() => {
                                 <div class="grade-act-sub mono">[POND: ${act.weight || 0}%]</div>
                             </div>
                             <div class="grade-input-wrap">
-                                <input type="number" step="${cfg.step}" min="0" max="${cfg.max}" class="grade-num-input mono"
-                                    value="${displayVal}" placeholder="${cfg.placeholder}"
+                                <input type="number" step="${cfg.step}" min="0" max="${mode === 'percentage' ? 100 : cfg.max}" class="grade-num-input mono"
+                                    value="${displayVal}" placeholder="${mode === 'percentage' ? '0-100%' : cfg.placeholder}"
+                                    oninput="Student.validateActivityInput(this, '${mode}')"
                                     onchange="Student.setActivityGrade('${act.id}', this.value)"
                                     title="${cfg.title}">
                                 <span class="grade-scale-tag">${cfg.tag}</span>
@@ -567,7 +656,7 @@ const Student = (() => {
                 } else {
                     const customGrade = getCustomCorteGrade(s.id, corteNum);
                     const displayCustom = (customGrade !== null && customGrade !== undefined && customGrade !== '')
-                        ? pctToDisplay(parseFloat(customGrade), mode)
+                        ? cortePctToDisplay(parseFloat(customGrade), mode)
                         : '';
                     actsListHtml = `
                         <div class="grade-entry-row">
@@ -578,6 +667,7 @@ const Student = (() => {
                             <div class="grade-input-wrap">
                                 <input type="number" step="${cfg.step}" min="0" max="${cfg.max}" class="grade-num-input mono"
                                     value="${displayCustom}" placeholder="${cfg.placeholder}"
+                                    oninput="Student.validateCorteInput(this, '${mode}')"
                                     onchange="Student.setCustomCorteGrade('${s.id}', ${corteNum}, this.value)"
                                     title="${cfg.title}">
                                 <span class="grade-scale-tag">${cfg.tag}</span>
@@ -598,7 +688,7 @@ const Student = (() => {
                 </div>`;
             }).join('');
 
-            const accumDisplay = pctToDisplay(m.totalAcumulado, mode);
+            const accumDisplay = totalPctToDisplay(m.totalAcumulado, mode);
             const scaleTag = mode === 'percentage' ? '/ 100%' : (mode === 'scale20' ? '/ 20 pts' : '/ 5 pts');
 
             html += `
@@ -2041,6 +2131,11 @@ const Student = (() => {
         exportGradesPdf,
         inputToPct,
         pctToDisplay,
+        inputToCortePct,
+        cortePctToDisplay,
+        totalPctToDisplay,
+        validateCorteInput,
+        validateActivityInput,
         // Identificación Estudiantil y Onboarding
         getProfile,
         hasActiveProfile,

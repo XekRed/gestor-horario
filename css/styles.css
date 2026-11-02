@@ -1214,6 +1214,17 @@ body {
     font-size: 0.65rem;
     color: var(--text-3);
 }
+/* Eliminar flechas de subir/bajar número (spinners) en todos los inputs numéricos */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
 .grade-input-wrap {
     display: flex;
     align-items: center;
