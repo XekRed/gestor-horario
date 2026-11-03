@@ -2903,20 +2903,37 @@ body.ui-compact .timeline-card {
    BLOQUEO ESTRICTO DE INTERFAZ Y ONBOARDING EN 2 PASOS
 ═══════════════════════════════════════════════════════════════ */
 
-/* Bloqueo total de la app si no hay perfil ni sesión admin */
-body.app-locked {
+/* Bloqueo estricto con estética de anuncio sobrepuesto (App visible al fondo con desenfoque) */
+html.app-locked, body.app-locked {
     overflow: hidden !important;
+    height: 100% !important;
+    max-height: 100vh !important;
 }
 
 body.app-locked .app-container {
-    display: none !important;
+    display: block !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    filter: blur(3.5px) brightness(0.68) !important;
+    transition: filter 0.3s ease;
 }
 
 body.app-locked .app-footer {
-    display: none !important;
+    display: block !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    filter: blur(3.5px) brightness(0.68) !important;
 }
 
-/* Overlay general de onboarding */
+/* Bloqueo de scroll cuando cualquier modal de inscripción o detalle está activo */
+html.modal-open, body.modal-open {
+    overflow: hidden !important;
+    height: 100% !important;
+    max-height: 100vh !important;
+    touch-action: none;
+}
+
+/* Overlay general de onboarding: Anuncio sobrepuesto */
 .onboarding-overlay {
     position: fixed;
     inset: 0;
@@ -2924,10 +2941,12 @@ body.app-locked .app-footer {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle at 50% 15%, #0d1e38, #050a14 85%);
-    backdrop-filter: blur(14px);
+    background: rgba(5, 10, 20, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     padding: 20px;
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .onboarding-bg-glow {

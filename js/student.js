@@ -1020,10 +1020,9 @@ const Student = (() => {
         const obScreen = document.getElementById('onboardingContainer');
 
         if (!hasProf && !isAdmin) {
-            // Usuario no identificado: asegurar horario en blanco (0 materias inscritas por defecto)
-            localStorage.setItem(LS.enrolled, JSON.stringify([]));
-            // Bloqueo total del resto de la app
+            // Bloqueo total de la interfaz con estética de anuncio sobrepuesto (app visible de fondo con desenfoque)
             document.body.classList.add('app-locked');
+            if (document.documentElement) document.documentElement.classList.add('app-locked');
             if (obScreen) {
                 obScreen.style.display = 'flex';
                 initOnboardingStep1();
@@ -1031,6 +1030,7 @@ const Student = (() => {
         } else {
             // Desbloqueo y renderizado normal
             document.body.classList.remove('app-locked');
+            if (document.documentElement) document.documentElement.classList.remove('app-locked');
             if (obScreen) {
                 obScreen.style.display = 'none';
             }
@@ -1061,38 +1061,56 @@ const Student = (() => {
             if (nameInput) nameInput.value = p.fullName || '';
             populateCascadeCareers(p.career, p.semester, p.sectionCode);
         } else {
-            populateCascadeCareers();
+            populateCascadeCareers('INGENIERIA DE SISTEMAS', 'VIII', '08S-2623-D1');
+        }
+    }
+
+    function loadTestData() {
+        const ciInput = document.getElementById('obInputCi');
+        const nameInput = document.getElementById('obInputName');
+        if (ciInput) ciInput.value = '12345678';
+        if (nameInput) nameInput.value = 'Estudiante Sistemas UNEFA';
+
+        populateCascadeCareers('INGENIERIA DE SISTEMAS', 'VIII', '08S-2623-D1');
+
+        if (typeof Notify !== 'undefined') {
+            Notify.toast('Datos cargados: VIII Semestre Sistemas (08S-2623-D1)', 'info', 2500);
         }
     }
 
     function populateCascadeCareers(selCareer = '', selSemester = '', selSection = '') {
-        const careerSelect = document.getElementById('obSelectCareer');
+        const careerSelect = document.getElementById('obSelectCareer') || document.getElementById('obSelectCarrera');
         if (!careerSelect) return;
 
         const sections = (typeof DB !== 'undefined' && DB.getSections) ? DB.getSections() : [];
         const careers = [...new Set(sections.map(s => (s.career || '').trim().toUpperCase()).filter(Boolean))].sort();
 
         if (careers.length === 0) {
-            careers.push('INGENIERÍA DE SISTEMAS');
+            careers.push('INGENIERIA DE SISTEMAS');
         }
 
         careerSelect.innerHTML = '<option value="">Selecciona Carrera...</option>' +
             careers.map(c => `<option value="${c}">${c}</option>`).join('');
 
-        if (selCareer && careers.includes(selCareer.toUpperCase())) {
-            careerSelect.value = selCareer.toUpperCase();
-            onCascadeCareerChange(selCareer.toUpperCase(), selSemester, selSection);
+        const targetCareer = selCareer || 'INGENIERIA DE SISTEMAS';
+        if (careers.some(c => c.toUpperCase() === targetCareer.toUpperCase())) {
+            careerSelect.value = targetCareer.toUpperCase();
+            onCascadeCareerChange(targetCareer.toUpperCase(), selSemester || 'VIII', selSection || '08S-2623-D1');
         } else {
-            onCascadeCareerChange('', '', '');
+            careerSelect.value = careers[0];
+            onCascadeCareerChange(careers[0], selSemester || 'VIII', selSection || '08S-2623-D1');
         }
     }
 
     function onCascadeCareerChange(career, selSemester = '', selSection = '') {
-        const semSelect = document.getElementById('obSelectSemester');
-        const secSelect = document.getElementById('obSelectSection');
+        const careerSelect = document.getElementById('obSelectCareer') || document.getElementById('obSelectCarrera');
+        const semSelect = document.getElementById('obSelectSemester') || document.getElementById('obSelectSemestre');
+        const secSelect = document.getElementById('obSelectSection') || document.getElementById('obSelectSeccion');
         if (!semSelect || !secSelect) return;
 
-        const cleanCareer = (career || '').trim().toUpperCase();
+        const rawCareer = (typeof career === 'string' && career) ? career : (careerSelect ? careerSelect.value : '');
+        const cleanCareer = (rawCareer || '').trim().toUpperCase();
+
         if (!cleanCareer) {
             semSelect.disabled = true;
             semSelect.innerHTML = '<option value="">Esperando Carrera...</option>';
@@ -1117,21 +1135,25 @@ const Student = (() => {
         semSelect.innerHTML = '<option value="">Selecciona Semestre...</option>' +
             semesters.map(sm => `<option value="${sm}">Semestre ${sm}</option>`).join('');
 
-        if (selSemester && semesters.includes(selSemester.toUpperCase())) {
-            semSelect.value = selSemester.toUpperCase();
-            onCascadeSemesterChange(selSemester.toUpperCase(), selSection);
+        const targetSem = selSemester || 'VIII';
+        if (semesters.some(sm => sm.toUpperCase() === targetSem.toUpperCase())) {
+            semSelect.value = targetSem.toUpperCase();
+            onCascadeSemesterChange(targetSem.toUpperCase(), selSection || '08S-2623-D1');
         } else {
-            onCascadeSemesterChange('', '');
+            semSelect.value = semesters[0];
+            onCascadeSemesterChange(semesters[0], selSection || '08S-2623-D1');
         }
     }
 
     function onCascadeSemesterChange(semester, selSection = '') {
-        const careerSelect = document.getElementById('obSelectCareer');
-        const secSelect = document.getElementById('obSelectSection');
+        const careerSelect = document.getElementById('obSelectCareer') || document.getElementById('obSelectCarrera');
+        const semSelect = document.getElementById('obSelectSemester') || document.getElementById('obSelectSemestre');
+        const secSelect = document.getElementById('obSelectSection') || document.getElementById('obSelectSeccion');
         if (!careerSelect || !secSelect) return;
 
         const cleanCareer = (careerSelect.value || '').trim().toUpperCase();
-        const cleanSemester = (semester || '').trim().toUpperCase();
+        const rawSem = (typeof semester === 'string' && semester) ? semester : (semSelect ? semSelect.value : '');
+        const cleanSemester = (rawSem || '').trim().toUpperCase();
 
         if (!cleanCareer || !cleanSemester) {
             secSelect.disabled = true;
@@ -1151,11 +1173,12 @@ const Student = (() => {
 
         secSelect.disabled = false;
         secSelect.innerHTML = '<option value="">Selecciona Sección...</option>' +
-            matching.map(s => `<option value="${s.section_code}">${s.section_code} (${s.period || 'Regular'})` + '</option>').join('');
+            matching.map(s => `<option value="${s.section_code}">${s.section_code} (${s.period || 'Regular'})</option>`).join('');
 
-        if (selSection && matching.some(s => s.section_code === selSection.toUpperCase())) {
-            secSelect.value = selSection.toUpperCase();
-        } else if (matching.length === 1) {
+        const targetSec = selSection || '08S-2623-D1';
+        if (matching.some(s => s.section_code === targetSec.toUpperCase())) {
+            secSelect.value = targetSec.toUpperCase();
+        } else if (matching.length > 0) {
             secSelect.value = matching[0].section_code;
         }
     }
@@ -1315,9 +1338,20 @@ const Student = (() => {
 
         saveProfile(profileData);
 
-        // Estudiante nuevo: garantizar 0 materias inscritas al iniciar
-        if (!existingStudent) {
-            localStorage.setItem(LS.enrolled, JSON.stringify([]));
+        // Auto-inscribir las materias oficiales de la sección seleccionada para permitir probar el horario de inmediato
+        const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
+            ? Schedule.getAllCatalogSubjects()
+            : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
+
+        const secSubjects = catalog.filter(s => {
+            const sSec = (s.section || s.section_code || '').trim().toUpperCase();
+            return sSec === sectionCode || (s.code && s.code.includes(sectionCode.slice(0, 3)));
+        });
+
+        const currentEnrolled = getEnrolledSubjectIds();
+        if (currentEnrolled.length === 0 && secSubjects.length > 0) {
+            const allSecIds = secSubjects.map(s => s.id);
+            localStorage.setItem(LS.enrolled, JSON.stringify(allSecIds));
         }
 
         // Guardar en Supabase en segundo plano
@@ -1366,18 +1400,18 @@ const Student = (() => {
     function renderOnboardingStep2() {
         const p = getProfile();
         const secCode = (p?.sectionCode || '08S-2623-D1').trim().toUpperCase();
-        const secLabel = document.getElementById('obStep2SectionLabel');
+        const secLabel = document.getElementById('obStep2SectionLabel') || document.getElementById('obStep2SecInfo');
         const countLabel = document.getElementById('obStep2CountLabel');
         const enrolledCount = getEnrolledSubjectIds().length;
 
-        if (secLabel) secLabel.textContent = secCode;
+        if (secLabel) secLabel.textContent = `Sección: ${secCode}`;
         if (countLabel) countLabel.textContent = `${enrolledCount} materias`;
 
         const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
             ? Schedule.getAllCatalogSubjects()
             : ((typeof DB !== 'undefined' ? DB.get('subjects') : []) || []);
 
-        const listContainer = document.getElementById('obSubjectsListContainer');
+        const listContainer = document.getElementById('obSubjectsListContainer') || document.getElementById('obSubjectsList');
         if (!listContainer) return;
 
         let displayList = [];
@@ -1462,7 +1496,7 @@ const Student = (() => {
     }
 
     function renderObPreview(subjectId) {
-        const previewEl = document.getElementById('obPreviewContainer');
+        const previewEl = document.getElementById('obPreviewContainer') || document.getElementById('obSubjectPreview');
         if (!previewEl) return;
 
         const catalog = (typeof Schedule !== 'undefined' && Schedule.getAllCatalogSubjects)
@@ -1625,6 +1659,7 @@ const Student = (() => {
 
     function finishOnboarding() {
         document.body.classList.remove('app-locked');
+        if (document.documentElement) document.documentElement.classList.remove('app-locked');
         document.body.style.overflow = '';
         const obScreen = document.getElementById('onboardingContainer');
         if (obScreen) obScreen.style.display = 'none';
@@ -1845,6 +1880,8 @@ const Student = (() => {
         if (searchInput) searchInput.value = _enrollSearchQuery;
 
         modal.classList.add('open');
+        document.body.classList.add('modal-open');
+        if (document.documentElement) document.documentElement.classList.add('modal-open');
         document.body.style.overflow = 'hidden';
         renderEnrollModal();
     }
@@ -1852,6 +1889,8 @@ const Student = (() => {
     function closeEnrollModal() {
         const modal = document.getElementById('modalEnrollment');
         if (modal) modal.classList.remove('open');
+        document.body.classList.remove('modal-open');
+        if (document.documentElement) document.documentElement.classList.remove('modal-open');
         document.body.style.overflow = '';
     }
 
@@ -2160,6 +2199,7 @@ const Student = (() => {
         saveProfile,
         updateHeaderProfile,
         checkOnboardingLock,
+        loadTestData,
         initOnboardingStep1,
         populateCascadeCareers,
         onCascadeCareerChange,

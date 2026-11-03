@@ -65,12 +65,21 @@
 
             <!-- PASO 1: Identificación y Selectores en Cascada -->
             <div id="onboardingStep1" class="onboarding-step-content">
+                <div style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                    <span style="font-size:0.75rem;color:var(--text-3);">Ingresa tus datos o prueba el horario oficial:</span>
+                    <button type="button" class="btn-ghost btn-sm" onclick="Student.loadTestData()" style="font-size:0.72rem;color:var(--cyan);border-color:rgba(0,240,255,0.35);background:rgba(0,240,255,0.06);display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="13" height="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Cargar Horario UNEFA VIII Sistemas (08S-2623-D1)
+                    </button>
+                </div>
+
                 <div id="obLookupNotice" class="lookup-notice-badge" style="display:none;"></div>
+                <div id="obStep1Error" class="auth-error-msg" style="display:none;margin-bottom:12px;color:var(--red);font-size:0.78rem;padding:8px 12px;background:rgba(255,46,95,0.1);border:1px solid rgba(255,46,95,0.3);border-radius:6px;"></div>
 
                 <div class="form-grid">
                     <div class="form-field">
                         <label class="form-label">Cédula de Identidad (V- / E-)</label>
-                        <input type="text" class="form-input" id="obInputCi" placeholder="Ej: 28456123 o V-28456123" inputmode="numeric" oninput="Student.onCiInput()" onblur="Student.onCiBlur()">
+                        <input type="text" class="form-input" id="obInputCi" placeholder="Ej: 28456123 o V-28456123" inputmode="numeric" oninput="Student.onCiInput(this.value)" onblur="Student.onCiBlur(this.value)">
                         <span style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">Escribe tu cédula: si ya estás registrado, tus datos se sincronizarán al instante.</span>
                     </div>
 
@@ -87,21 +96,21 @@
 
                     <div class="form-field">
                         <label class="form-label">Carrera</label>
-                        <select class="form-input" id="obSelectCarrera" onchange="Student.onCascadeCareerChange()">
+                        <select class="form-input" id="obSelectCareer" onchange="Student.onCascadeCareerChange(this.value)">
                             <option value="">Selecciona tu Carrera...</option>
                         </select>
                     </div>
 
                     <div class="form-field">
                         <label class="form-label">Semestre</label>
-                        <select class="form-input" id="obSelectSemestre" disabled onchange="Student.onCascadeSemesterChange()">
+                        <select class="form-input" id="obSelectSemester" disabled onchange="Student.onCascadeSemesterChange(this.value)">
                             <option value="">Primero selecciona una Carrera</option>
                         </select>
                     </div>
 
                     <div class="form-field" style="grid-column: 1 / -1;">
                         <label class="form-label">Código de Sección</label>
-                        <select class="form-input" id="obSelectSeccion" disabled onchange="Student.onCascadeSectionChange()">
+                        <select class="form-input" id="obSelectSection" disabled onchange="Student.onCascadeSectionChange(this.value)">
                             <option value="">Primero selecciona Semestre</option>
                         </select>
                         <span style="font-size:0.68rem;color:var(--text-3);margin-top:2px;">Los códigos de sección corresponden a las asignadas activas por el Administrador.</span>
@@ -120,30 +129,30 @@
             <div id="onboardingStep2" class="onboarding-step-content" style="display:none;">
                 <div class="ob-step2-top-bar">
                     <div class="ob-step2-info">
-                        <span class="mono" style="color:var(--cyan);font-weight:700;" id="obStep2SecInfo">Sección: —</span>
+                        <span class="mono" style="color:var(--cyan);font-weight:700;" id="obStep2SectionLabel">Sección: 08S-2623-D1</span>
                         <span style="font-size:0.75rem;color:var(--text-2);">Materias recomendadas para tu semestre</span>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;">
-                        <button type="button" class="btn-ghost btn-sm" onclick="Student.enrollAllSectionSubjects()" style="color:var(--green);border-color:rgba(0,229,160,0.3);background:rgba(0,229,160,0.06);">
+                        <button type="button" class="btn-ghost btn-sm" id="btnBatchEnrollSection" onclick="Student.enrollAllSectionSubjects()" style="color:var(--green);border-color:rgba(0,229,160,0.3);background:rgba(0,229,160,0.06);cursor:pointer;">
                             Inscribir todas las de mi sección
                         </button>
                     </div>
                 </div>
 
                 <div class="ob-search-row" style="margin-top:12px;margin-bottom:12px;">
-                    <input type="text" class="form-input" id="obSearchCodeInput" placeholder="Buscar materia por código (ej: AUD-08S, TEL-08S)..." oninput="Student.onObSearchInput()">
+                    <input type="text" class="form-input" id="obSearchCodeInput" placeholder="Buscar materia por código (ej: AUD-08S, TEL-08S, MAT)..." oninput="Student.onObSearchInput(this.value)">
                 </div>
 
                 <div class="ob-step2-grid">
                     <!-- Columna izquierda: Lista de materias -->
                     <div class="ob-step2-list-col">
-                        <div class="ob-subjects-list" id="obSubjectsList">
+                        <div class="ob-subjects-list" id="obSubjectsListContainer">
                             <!-- Inyectado por Student.renderOnboardingStep2() -->
                         </div>
                     </div>
                     <!-- Columna derecha: Vista previa interactiva -->
                     <div class="ob-step2-preview-col">
-                        <div class="ob-preview-container" id="obSubjectPreview">
+                        <div class="ob-preview-container" id="obPreviewContainer">
                             <div class="ob-preview-placeholder">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="32" height="32" style="color:var(--text-3);margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                                 <div>Selecciona una materia de la lista para ver sus horarios, profesor, aula y actividades programadas.</div>
@@ -154,7 +163,7 @@
 
                 <div class="onboarding-footer-actions" style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;">
                     <button type="button" class="btn-ghost" onclick="Student.finishOnboarding()" style="font-size:0.8rem;color:var(--text-3);">
-                        Ir al Panel Principal (Inscribir más tarde)
+                        Ir al Panel Principal
                     </button>
                     <button type="button" class="btn-primary" onclick="Student.finishOnboarding()" style="padding:10px 24px;font-size:0.88rem;display:flex;align-items:center;gap:8px;">
                         Finalizar y Entrar al Horario

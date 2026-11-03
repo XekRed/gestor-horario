@@ -388,117 +388,117 @@ insert into public.section_admins (email, section_code)
 values ('danidmartinez321@gmail.com', '08S-2623-D1')
 on conflict do nothing;
 
--- 11.3. Profesores Registrados (Base para Fase Futura)
+-- 11.3. Profesores Registrados (Oficiales según Horario UNEFA VIII Sistemas)
 insert into public.professors (id, name, email, department)
 values
-    ('11111111-1111-1111-1111-111111111101', 'Ing. Carlos Pérez', 'carlos.perez@universidad.edu.ve', 'Auditoría y Sistemas'),
-    ('11111111-1111-1111-1111-111111111102', 'Ing. María Gómez', 'maria.gomez@universidad.edu.ve', 'Redes y Telecomunicaciones'),
-    ('11111111-1111-1111-1111-111111111103', 'Prof. Luis Rondón', 'luis.rondon@universidad.edu.ve', 'Proyectos y Gestión'),
-    ('11111111-1111-1111-1111-111111111104', 'Prof. Ana Díaz', 'ana.diaz@universidad.edu.ve', 'Matemáticas y Métodos'),
-    ('11111111-1111-1111-1111-111111111105', 'Cap. Rodríguez', 'rodriguez.defensa@universidad.edu.ve', 'Defensa Integral'),
-    ('11111111-1111-1111-1111-111111111106', 'Ing. José Martínez', 'jose.martinez@universidad.edu.ve', 'Ciencias Computacionales'),
-    ('11111111-1111-1111-1111-111111111107', 'Abg. Rosa Flores', 'rosa.flores@universidad.edu.ve', 'Ciencias Jurídicas'),
-    ('11111111-1111-1111-1111-111111111108', 'Lic. Elena Suárez', 'elena.suarez@universidad.edu.ve', 'Formación General')
+    ('11111111-1111-1111-1111-111111111101', 'Bellamelis Dominguez Ochoa', 'bellamelis.dominguez@unefa.edu.ve', 'Auditoría de Sistemas'),
+    ('11111111-1111-1111-1111-111111111102', 'Maille Mireli Altuve Diaz', 'maille.altuve@unefa.edu.ve', 'Teleprocesos'),
+    ('11111111-1111-1111-1111-111111111103', 'Rafael Alfonso Lopez Urriola', 'rafael.lopez@unefa.edu.ve', 'Planificación y Proyectos'),
+    ('11111111-1111-1111-1111-111111111104', 'Johan Javier Goyo Colmenarez', 'johan.goyo@unefa.edu.ve', 'Teoría de Decisiones'),
+    ('11111111-1111-1111-1111-111111111105', 'Antonio Jose Fuentes Verastegui', 'antonio.fuentes@unefa.edu.ve', 'Defensa Integral'),
+    ('11111111-1111-1111-1111-111111111106', 'Victor Julio Dominguez Ochoa', 'victor.dominguez@unefa.edu.ve', 'Inteligencia Artificial'),
+    ('11111111-1111-1111-1111-111111111107', 'Meibis Carolina Garcia Herrera', 'meibis.garcia@unefa.edu.ve', 'Marco Legal'),
+    ('11111111-1111-1111-1111-111111111108', 'Yokasta Castro Osal', 'yokasta.castro@unefa.edu.ve', 'Cultura y Comunicación')
 on conflict (email) do nothing;
 
--- 11.4. Materias Oficiales de la Sección (Códigos únicos de inscripción estandarizados)
+-- 11.4. Materias Oficiales de la Sección (Códigos Pensum Estandarizados y Bloques Exactos)
 insert into public.subjects (id, subject_code, section_code, name, short_name, classroom, professor, professor_id, color, schedule_blocks)
 values
 (
-    'cultura',
-    'CCOM-08S',
-    '08S-2623-D1',
-    'CULTURA Y COMUNICACIÓN',
-    'CCOM',
-    'YSSF-010',
-    'Lic. Elena Suárez',
-    '11111111-1111-1111-1111-111111111108',
-    '#9b59b6',
-    '[{"day": 0, "startBlock": 2, "span": 2}]'::jsonb
-),
-(
-    'auditoria',
-    'AUD-08S',
-    '08S-2623-D1',
-    'AUDITORÍA DE SISTEMAS',
-    'AUD',
-    'YSSF-010',
-    'Ing. Carlos Pérez',
-    '11111111-1111-1111-1111-111111111101',
-    '#ff9f43',
-    '[{"day": 0, "startBlock": 4, "span": 3}, {"day": 2, "startBlock": 1, "span": 3}]'::jsonb
-),
-(
-    'teleprocesos',
-    'TEL-08S',
-    '08S-2623-D1',
-    'TELEPROCESOS',
-    'TEL',
-    'YSSF-027',
-    'Ing. María Gómez',
-    '11111111-1111-1111-1111-111111111102',
-    '#00e5a0',
-    '[{"day": 0, "startBlock": 8, "span": 6}]'::jsonb
-),
-(
-    'planificacion',
-    'PEP-08S',
-    '08S-2623-D1',
-    'PLANIFICACIÓN Y EVALUACIÓN DE PROYECTOS (ENT)',
-    'PEP',
-    'YSSF-010',
-    'Prof. Luis Rondón',
-    '11111111-1111-1111-1111-111111111103',
-    '#5865F2',
-    '[{"day": 2, "startBlock": 4, "span": 3}]'::jsonb
-),
-(
     'teoria',
-    'TDEC-08S',
+    'MAT-31314',
     '08S-2623-D1',
     'TEORÍA DE DECISIONES',
     'TDEC',
     'YSSF-010',
-    'Prof. Ana Díaz',
+    'Johan Javier Goyo Colmenarez',
     '11111111-1111-1111-1111-111111111104',
     '#ff2e5f',
-    '[{"day": 3, "startBlock": 2, "span": 5}]'::jsonb
-),
-(
-    'defensa',
-    'DIN8-08S',
-    '08S-2623-D1',
-    'DEFENSA INTEGRAL DE LA NACIÓN VIII',
-    'DIN8',
-    null,
-    'Cap. Rodríguez',
-    '11111111-1111-1111-1111-111111111105',
-    '#00bfa5',
-    '[{"day": 3, "startBlock": 8, "span": 4}]'::jsonb
-),
-(
-    'ia',
-    'IA-08S',
-    '08S-2623-D1',
-    'INTELIGENCIA ARTIFICIAL (ET)',
-    'IA',
-    'YSSF-010',
-    'Ing. José Martínez',
-    '11111111-1111-1111-1111-111111111106',
-    '#f9ca24',
-    '[{"day": 4, "startBlock": 3, "span": 4}]'::jsonb
+    '[{"day": 3, "startBlock": 1, "span": 5}]'::jsonb
 ),
 (
     'marco',
-    'MLEG-08S',
+    'CJU-37314',
     '08S-2623-D1',
     'MARCO LEGAL PARA EL EJER. DE LA INGENIERÍA',
     'MLEG',
     'YSSF-010',
-    'Abg. Rosa Flores',
+    'Meibis Carolina Garcia Herrera',
     '11111111-1111-1111-1111-111111111107',
     '#fd79a8',
-    '[{"day": 4, "startBlock": 8, "span": 4}]'::jsonb
+    '[{"day": 4, "startBlock": 7, "span": 4}]'::jsonb
+),
+(
+    'teleprocesos',
+    'TTC-31154',
+    '08S-2623-D1',
+    'TELEPROCESOS',
+    'TEL',
+    'YSSF-027',
+    'Maille Mireli Altuve Diaz',
+    '11111111-1111-1111-1111-111111111102',
+    '#00e5a0',
+    '[{"day": 0, "startBlock": 7, "span": 6}]'::jsonb
+),
+(
+    'ia',
+    'ESI-31153',
+    '08S-2623-D1',
+    'INTELIGENCIA ARTIFICIAL (ET)',
+    'IA',
+    'YSSF-010',
+    'Victor Julio Dominguez Ochoa',
+    '11111111-1111-1111-1111-111111111106',
+    '#f9ca24',
+    '[{"day": 4, "startBlock": 2, "span": 4}]'::jsonb
+),
+(
+    'planificacion',
+    'ENT-31123',
+    '08S-2623-D1',
+    'PLANIFICACIÓN Y EVALUACIÓN DE PROYECTOS (ENT)',
+    'PEP',
+    'YSSF-010',
+    'Rafael Alfonso Lopez Urriola',
+    '11111111-1111-1111-1111-111111111103',
+    '#5865F2',
+    '[{"day": 2, "startBlock": 3, "span": 3}]'::jsonb
+),
+(
+    'defensa',
+    'DIN-31183',
+    '08S-2623-D1',
+    'DEFENSA INTEGRAL DE LA NACIÓN VIII',
+    'DIN8',
+    'YSSF-010',
+    'Antonio Jose Fuentes Verastegui',
+    '11111111-1111-1111-1111-111111111105',
+    '#00bfa5',
+    '[{"day": 3, "startBlock": 7, "span": 4}]'::jsonb
+),
+(
+    'auditoria',
+    'SYC-32814',
+    '08S-2623-D1',
+    'AUDITORÍA DE SISTEMAS',
+    'AUD',
+    'YSSF-010',
+    'Bellamelis Dominguez Ochoa',
+    '11111111-1111-1111-1111-111111111101',
+    '#ff9f43',
+    '[{"day": 0, "startBlock": 3, "span": 3}, {"day": 2, "startBlock": 1, "span": 2}]'::jsonb
+),
+(
+    'cultura',
+    'ACT-13010',
+    '08S-2623-D1',
+    'CULTURA Y COMUNICACIÓN',
+    'CCOM',
+    'YSSF-010',
+    'Yokasta Castro Osal',
+    '11111111-1111-1111-1111-111111111108',
+    '#9b59b6',
+    '[{"day": 0, "startBlock": 1, "span": 2}]'::jsonb
 )
 on conflict (id) do update set
     subject_code = excluded.subject_code,
@@ -509,56 +509,3 @@ on conflict (id) do update set
     professor_id = excluded.professor_id,
     color = excluded.color,
     schedule_blocks = excluded.schedule_blocks;
-
--- 11.5. Evaluaciones Iniciales de Ejemplo
-insert into public.activities (id, subject_id, section_code, is_special_event, title, cut, percentage, priority, due_date, guidelines)
-values
-(
-    'seed-act-1',
-    'auditoria',
-    '08S-2623-D1',
-    false,
-    'Parcial I: Normas y Estándares COBIT / ITIL',
-    1,
-    20,
-    'alta',
-    now() + interval '3 days',
-    '{"mode": "individual", "deliveryFormat": "pdf", "resourceLink": "https://drive.google.com/", "instructions": "Evaluación individual sobre marco COBIT 2019 y matriz de control interno."}'::jsonb
-),
-(
-    'seed-act-2',
-    'teleprocesos',
-    '08S-2623-D1',
-    false,
-    'Laboratorio Práctico: Topología WAN en Packet Tracer',
-    1,
-    25,
-    'alta',
-    now() + interval '7 days',
-    '{"mode": "group", "groupMax": 3, "deliveryFormat": "github", "resourceLink": "https://github.com/", "instructions": "Diseño con enrutamiento dinámico OSPFv2 y subredes VLAN."}'::jsonb
-),
-(
-    'seed-act-3',
-    'teoria',
-    '08S-2623-D1',
-    false,
-    'Taller de Árboles de Decisión y Criterio de Bayes',
-    1,
-    15,
-    'media',
-    now() + interval '12 days',
-    '{"mode": "group", "groupMax": 2, "deliveryFormat": "pdf", "instructions": "Resolución de casos bajo condiciones de riesgo e incertidumbre."}'::jsonb
-),
-(
-    'seed-act-4',
-    null,
-    '08S-2623-D1',
-    true,
-    'Acto Cívico e Izada de Bandera Universitaria',
-    1,
-    0,
-    'baja',
-    now() + interval '1 day',
-    '{"mode": "individual", "deliveryFormat": "in_person", "instructions": "Asistencia obligatoria con vestimenta formal o uniforme en el patio central."}'::jsonb
-)
-on conflict (id) do nothing;

@@ -7,130 +7,148 @@
 const Schedule = (() => {
 
     /* ── BLOQUES DE TIEMPO DE 45 MINUTOS ──────────────────────── */
+    // Horario Oficial Universitario UNEFA (7 Bloques Mañana + 6 Bloques Tarde)
     const MORNING_BLOCKS = [
-        { id: 'form',  label: 'FORMACIÓN',   start: '07:00', end: '07:45', isFormacion: true },
-        { id: 'b1',    label: '7:45',         start: '7:45',  end: '8:30'  },
-        { id: 'b2',    label: '8:30',         start: '8:30',  end: '9:15'  },
-        { id: 'b3',    label: '9:15',         start: '9:15',  end: '10:00' },
-        { id: 'b4',    label: '10:00',        start: '10:00', end: '10:45' },
-        { id: 'b5',    label: '10:45',        start: '10:45', end: '11:30' },
-        { id: 'b6',    label: '11:30',        start: '11:30', end: '12:15' },
-        { id: 'b7',    label: '12:15',        start: '12:15', end: '13:00' },
+        { id: 'b0',    label: '7:45',         start: '7:45',  end: '8:30', isFormacion: true },
+        { id: 'b1',    label: '8:30',         start: '8:30',  end: '9:15'  },
+        { id: 'b2',    label: '9:15',         start: '9:15',  end: '10:00' },
+        { id: 'b3',    label: '10:00',        start: '10:00', end: '10:45' },
+        { id: 'b4',    label: '10:45',        start: '10:45', end: '11:30' },
+        { id: 'b5',    label: '11:30',        start: '11:30', end: '12:15' },
+        { id: 'b6',    label: '12:15',        start: '12:15', end: '13:00' },
     ];
     const AFTERNOON_BLOCKS = [
-        { id: 'b8',    label: '13:00',        start: '13:00', end: '13:45' },
-        { id: 'b9',    label: '13:45',        start: '13:45', end: '14:30' },
-        { id: 'b10',   label: '14:30',        start: '14:30', end: '15:15' },
-        { id: 'b11',   label: '15:15',        start: '15:15', end: '16:00' },
-        { id: 'b12',   label: '16:00',        start: '16:00', end: '16:45' },
-        { id: 'b13',   label: '16:45',        start: '16:45', end: '17:30' },
+        { id: 'b7',    label: '13:00',        start: '13:00', end: '13:45' },
+        { id: 'b8',    label: '13:45',        start: '13:45', end: '14:30' },
+        { id: 'b9',    label: '14:30',        start: '14:30', end: '15:15' },
+        { id: 'b10',   label: '15:15',        start: '15:15', end: '16:00' },
+        { id: 'b11',   label: '16:00',        start: '16:00', end: '16:45' },
+        { id: 'b12',   label: '16:45',        start: '16:45', end: '17:30' },
     ];
     const ALL_BLOCKS = [...MORNING_BLOCKS, ...AFTERNOON_BLOCKS];
-    // Índices: 0=FORMACIÓN, 1-7=MAÑANA, 8-13=TARDE
+    // Índices Absolutos:
+    // 0: 7:45-8:30 | 1: 8:30-9:15 | 2: 9:15-10:00 | 3: 10:00-10:45 | 4: 10:45-11:30 | 5: 11:30-12:15 | 6: 12:15-13:00
+    // 7: 13:00-13:45 | 8: 13:45-14:30 | 9: 14:30-15:15 | 10: 15:15-16:00 | 11: 16:00-16:45 | 12: 16:45-17:30
 
     /* ── DÍAS DE LA SEMANA ────────────────────────────────────── */
     const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     // Índice de día: 0=Lun, 1=Mar, 2=Mié, 3=Jue, 4=Vie, 5=Sáb
 
-    /* ── MATERIAS SEMILLA CON CÓDIGOS OFICIALES ───────────────── */
+    /* ── MATERIAS SEMILLA OFICIALES (SECCIÓN 08S-2623-D1) ────────── */
     const SEED_SUBJECTS = [
-        {
-            id: 'cultura',
-            name: 'CULTURA Y COMUNICACIÓN',
-            shortName: 'CCOM',
-            code: 'CCOM-08S',
-            room: 'YSSF-010',
-            teacher: '',
-            color: '#9b59b6',
-            slots: [
-                { day: 0, startBlock: 2, span: 2 }  // Lun 8:30-10:00
-            ]
-        },
-        {
-            id: 'auditoria',
-            name: 'AUDITORÍA DE SISTEMAS',
-            shortName: 'AUD',
-            code: 'AUD-08S',
-            room: 'YSSF-010',
-            teacher: 'Ing. Carlos Pérez',
-            color: '#ff9f43',
-            slots: [
-                { day: 0, startBlock: 4, span: 3 },  // Lun 10:00-12:15
-                { day: 2, startBlock: 1, span: 3 }   // Mié 7:45-10:00
-            ]
-        },
-        {
-            id: 'teleprocesos',
-            name: 'TELEPROCESOS',
-            shortName: 'TEL',
-            code: 'TEL-08S',
-            room: 'YSSF-027',
-            teacher: 'Ing. María Gómez',
-            color: '#00e5a0',
-            slots: [
-                { day: 0, startBlock: 8, span: 6 }  // Lun 13:00-17:30
-            ]
-        },
-        {
-            id: 'planificacion',
-            name: 'PLANIFICACIÓN Y EVALUACIÓN DE PROYECTOS (ENT)',
-            shortName: 'PEP',
-            code: 'PEP-08S',
-            room: 'YSSF-010',
-            teacher: 'Prof. Luis Rondón',
-            color: '#5865F2',
-            slots: [
-                { day: 2, startBlock: 4, span: 3 }  // Mié 10:00-12:15
-            ]
-        },
         {
             id: 'teoria',
             name: 'TEORÍA DE DECISIONES',
             shortName: 'TDEC',
-            code: 'TDEC-08S',
+            code: 'MAT-31314',
+            section: '08S-2623-D1',
             room: 'YSSF-010',
-            teacher: 'Prof. Ana Díaz',
+            teacher: 'Johan Javier Goyo Colmenarez',
+            teacherCi: '15.427.252',
             color: '#ff2e5f',
             slots: [
-                { day: 3, startBlock: 2, span: 5 }  // Jue 8:30-12:15
-            ]
-        },
-        {
-            id: 'defensa',
-            name: 'DEFENSA INTEGRAL DE LA NACIÓN VIII',
-            shortName: 'DIN8',
-            code: 'DIN8-08S',
-            room: null,
-            teacher: 'Cap. Rodríguez',
-            color: '#00bfa5',
-            slots: [
-                { day: 3, startBlock: 8, span: 4 }  // Jue 13:00-16:00
-            ]
-        },
-        {
-            id: 'ia',
-            name: 'INTELIGENCIA ARTIFICIAL (ET)',
-            shortName: 'IA',
-            code: 'IA-08S',
-            room: 'YSSF-010',
-            teacher: 'Ing. José Martínez',
-            color: '#f9ca24',
-            slots: [
-                { day: 4, startBlock: 3, span: 4 }  // Vie 9:15-12:15
+                { day: 3, startBlock: 1, span: 5 }  // Jue 8:30-12:15 (5 hrs)
             ]
         },
         {
             id: 'marco',
             name: 'MARCO LEGAL PARA EL EJER. DE LA INGENIERÍA',
             shortName: 'MLEG',
-            code: 'MLEG-08S',
+            code: 'CJU-37314',
+            section: '08S-2623-D1',
             room: 'YSSF-010',
-            teacher: 'Abg. Rosa Flores',
+            teacher: 'Meibis Carolina Garcia Herrera',
+            teacherCi: '13.796.135',
             color: '#fd79a8',
             slots: [
-                { day: 4, startBlock: 8, span: 4 }  // Vie 13:00-16:00
+                { day: 4, startBlock: 7, span: 4 }  // Vie 13:00-16:00 (4 hrs)
             ]
         },
+        {
+            id: 'teleprocesos',
+            name: 'TELEPROCESOS',
+            shortName: 'TEL',
+            code: 'TTC-31154',
+            section: '08S-2623-D1',
+            room: 'YSSF-027',
+            teacher: 'Maille Mireli Altuve Diaz',
+            teacherCi: '14.584.829',
+            color: '#00e5a0',
+            slots: [
+                { day: 0, startBlock: 7, span: 6 }  // Lun 13:00-17:30 (6 hrs)
+            ]
+        },
+        {
+            id: 'ia',
+            name: 'INTELIGENCIA ARTIFICIAL (ET)',
+            shortName: 'IA',
+            code: 'ESI-31153',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Victor Julio Dominguez Ochoa',
+            teacherCi: '10.858.141',
+            color: '#f9ca24',
+            slots: [
+                { day: 4, startBlock: 2, span: 4 }  // Vie 9:15-12:15 (4 hrs)
+            ]
+        },
+        {
+            id: 'planificacion',
+            name: 'PLANIFICACIÓN Y EVALUACIÓN DE PROYECTOS (ENT)',
+            shortName: 'PEP',
+            code: 'ENT-31123',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Rafael Alfonso Lopez Urriola',
+            teacherCi: '16.950.395',
+            color: '#5865F2',
+            slots: [
+                { day: 2, startBlock: 3, span: 3 }  // Mié 10:00-12:15 (3 hrs)
+            ]
+        },
+        {
+            id: 'defensa',
+            name: 'DEFENSA INTEGRAL DE LA NACIÓN VIII',
+            shortName: 'DIN8',
+            code: 'DIN-31183',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Antonio Jose Fuentes Verastegui',
+            teacherCi: '11.276.978',
+            color: '#00bfa5',
+            slots: [
+                { day: 3, startBlock: 7, span: 4 }  // Jue 13:00-16:00 (4 hrs)
+            ]
+        },
+        {
+            id: 'auditoria',
+            name: 'AUDITORÍA DE SISTEMAS',
+            shortName: 'AUD',
+            code: 'SYC-32814',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Bellamelis Dominguez Ochoa',
+            teacherCi: '12.077.392',
+            color: '#ff9f43',
+            slots: [
+                { day: 0, startBlock: 3, span: 3 }, // Lun 10:00-12:15 (3 hrs)
+                { day: 2, startBlock: 1, span: 2 }  // Mié 8:30-10:00 (2 hrs)
+            ]
+        },
+        {
+            id: 'cultura',
+            name: 'CULTURA Y COMUNICACIÓN',
+            shortName: 'CCOM',
+            code: 'ACT-13010',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Yokasta Castro Osal',
+            teacherCi: '13.519.138',
+            color: '#9b59b6',
+            slots: [
+                { day: 0, startBlock: 1, span: 2 }  // Lun 8:30-10:00 (2 hrs)
+            ]
+        }
     ];
 
     /* ── ESTADO LOCAL ─────────────────────────────────────────── */
@@ -194,7 +212,12 @@ const Schedule = (() => {
             if (typeof Prefs !== 'undefined') {
                 enrolled = enrolled.filter(s => !Prefs.isSubjectHidden(s.id));
             }
-            return enrolled;
+            if (enrolled && enrolled.length > 0) return enrolled;
+        }
+        // Si el estudiante no está identificado o la app está bloqueada en onboarding, mostrar la plantilla de la sección para el fondo
+        if (typeof document !== 'undefined' && document.body && document.body.classList.contains('app-locked')) {
+            const catalog = (typeof DB !== 'undefined' ? DB.get('subjects') : []) || subjects || SEED_SUBJECTS;
+            return (catalog && catalog.length > 0) ? catalog : SEED_SUBJECTS;
         }
         return [];
     }
@@ -402,14 +425,10 @@ const Schedule = (() => {
             html += '<tr>';
 
             /* Celda de hora */
-            if (block.isFormacion) {
-                html += `<td class="sch-time-cell" style="color:var(--cyan);letter-spacing:1px;font-size:0.62rem;font-weight:700;">FORMACIÓN</td>`;
-            } else {
-                html += `<td class="sch-time-cell">
-                    <span class="time-main">${block.start}</span>
-                    <span class="time-end">${block.end}</span>
-                </td>`;
-            }
+            html += `<td class="sch-time-cell">
+                <span class="time-main">${block.start}</span>
+                <span class="time-end">${block.end}</span>
+            </td>`;
 
             /* Celdas de los días */
             for (let d = 0; d < DAYS.length; d++) {
@@ -452,8 +471,18 @@ const Schedule = (() => {
                         </div>
                     </td>`;
                 } else {
-                    const isForm = block.isFormacion;
-                    html += `<td class="${isForm ? 'sch-form-cell' : 'sch-empty-cell'}">${isForm ? '—' : ''}</td>`;
+                    if (b === 0) {
+                        // Bloque 0 (7:45 - 8:30): Cívico lunes y Formación martes a viernes
+                        if (d === 0) {
+                            html += `<td class="sch-form-cell" style="font-weight:700;color:var(--text-1);font-size:0.72rem;letter-spacing:0.5px;">CIVICO</td>`;
+                        } else if (d >= 1 && d <= 4) {
+                            html += `<td class="sch-form-cell" style="font-weight:700;color:var(--text-2);font-size:0.72rem;letter-spacing:0.5px;">FORMACION</td>`;
+                        } else {
+                            html += `<td class="sch-empty-cell"></td>`;
+                        }
+                    } else {
+                        html += `<td class="sch-empty-cell"></td>`;
+                    }
                 }
             }
             html += '</tr>';

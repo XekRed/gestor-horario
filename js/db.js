@@ -34,92 +34,108 @@ const DB = (() => {
     ═══════════════════════════════════════════════════════════ */
     const SEED_SUBJECTS = [
         {
-            id: 'cultura',
-            name: 'CULTURA Y COMUNICACIÓN',
-            shortName: 'CCOM',
-            code: 'CCOM-08S',
-            room: 'YSSF-010',
-            teacher: '',
-            color: '#9b59b6',
-            slots: [{ day: 0, startBlock: 2, span: 2 }]
-        },
-        {
-            id: 'auditoria',
-            name: 'AUDITORÍA DE SISTEMAS',
-            shortName: 'AUD',
-            code: 'AUD-08S',
-            room: 'YSSF-010',
-            teacher: 'Ing. Carlos Pérez',
-            color: '#ff9f43',
-            slots: [
-                { day: 0, startBlock: 4, span: 3 },
-                { day: 2, startBlock: 1, span: 3 }
-            ]
-        },
-        {
-            id: 'teleprocesos',
-            name: 'TELEPROCESOS',
-            shortName: 'TEL',
-            code: 'TEL-08S',
-            room: 'YSSF-027',
-            teacher: 'Ing. María Gómez',
-            color: '#00e5a0',
-            slots: [{ day: 0, startBlock: 8, span: 6 }]
-        },
-        {
-            id: 'planificacion',
-            name: 'PLANIFICACIÓN Y EVALUACIÓN DE PROYECTOS (ENT)',
-            shortName: 'PEP',
-            code: 'PEP-08S',
-            room: 'YSSF-010',
-            teacher: 'Prof. Luis Rondón',
-            color: '#5865F2',
-            slots: [{ day: 2, startBlock: 4, span: 3 }]
-        },
-        {
             id: 'teoria',
             name: 'TEORÍA DE DECISIONES',
             shortName: 'TDEC',
-            code: 'TDEC-08S',
+            code: 'MAT-31314',
+            section: '08S-2623-D1',
             room: 'YSSF-010',
-            teacher: 'Prof. Ana Díaz',
+            teacher: 'Johan Javier Goyo Colmenarez',
+            teacherCi: '15.427.252',
             color: '#ff2e5f',
-            slots: [{ day: 3, startBlock: 2, span: 5 }]
-        },
-        {
-            id: 'defensa',
-            name: 'DEFENSA INTEGRAL DE LA NACIÓN VIII',
-            shortName: 'DIN8',
-            code: 'DIN8-08S',
-            room: '',
-            teacher: 'Cap. Rodríguez',
-            color: '#00bfa5',
-            slots: [{ day: 3, startBlock: 8, span: 4 }]
-        },
-        {
-            id: 'ia',
-            name: 'INTELIGENCIA ARTIFICIAL (ET)',
-            shortName: 'IA',
-            code: 'IA-08S',
-            room: 'YSSF-010',
-            teacher: 'Ing. José Martínez',
-            color: '#f9ca24',
-            slots: [{ day: 4, startBlock: 3, span: 4 }]
+            slots: [{ day: 3, startBlock: 1, span: 5 }] // Jue 8:30-12:15 (5 hrs)
         },
         {
             id: 'marco',
             name: 'MARCO LEGAL PARA EL EJER. DE LA INGENIERÍA',
             shortName: 'MLEG',
-            code: 'MLEG-08S',
+            code: 'CJU-37314',
+            section: '08S-2623-D1',
             room: 'YSSF-010',
-            teacher: 'Abg. Rosa Flores',
+            teacher: 'Meibis Carolina Garcia Herrera',
+            teacherCi: '13.796.135',
             color: '#fd79a8',
-            slots: [{ day: 4, startBlock: 8, span: 4 }]
+            slots: [{ day: 4, startBlock: 7, span: 4 }] // Vie 13:00-16:00 (4 hrs)
         },
+        {
+            id: 'teleprocesos',
+            name: 'TELEPROCESOS',
+            shortName: 'TEL',
+            code: 'TTC-31154',
+            section: '08S-2623-D1',
+            room: 'YSSF-027',
+            teacher: 'Maille Mireli Altuve Diaz',
+            teacherCi: '14.584.829',
+            color: '#00e5a0',
+            slots: [{ day: 0, startBlock: 7, span: 6 }] // Lun 13:00-17:30 (6 hrs)
+        },
+        {
+            id: 'ia',
+            name: 'INTELIGENCIA ARTIFICIAL (ET)',
+            shortName: 'IA',
+            code: 'ESI-31153',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Victor Julio Dominguez Ochoa',
+            teacherCi: '10.858.141',
+            color: '#f9ca24',
+            slots: [{ day: 4, startBlock: 2, span: 4 }] // Vie 9:15-12:15 (4 hrs)
+        },
+        {
+            id: 'planificacion',
+            name: 'PLANIFICACIÓN Y EVALUACIÓN DE PROYECTOS (ENT)',
+            shortName: 'PEP',
+            code: 'ENT-31123',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Rafael Alfonso Lopez Urriola',
+            teacherCi: '16.950.395',
+            color: '#5865F2',
+            slots: [{ day: 2, startBlock: 3, span: 3 }] // Mié 10:00-12:15 (3 hrs)
+        },
+        {
+            id: 'defensa',
+            name: 'DEFENSA INTEGRAL DE LA NACIÓN VIII',
+            shortName: 'DIN8',
+            code: 'DIN-31183',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Antonio Jose Fuentes Verastegui',
+            teacherCi: '11.276.978',
+            color: '#00bfa5',
+            slots: [{ day: 3, startBlock: 7, span: 4 }] // Jue 13:00-16:00 (4 hrs)
+        },
+        {
+            id: 'auditoria',
+            name: 'AUDITORÍA DE SISTEMAS',
+            shortName: 'AUD',
+            code: 'SYC-32814',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Bellamelis Dominguez Ochoa',
+            teacherCi: '12.077.392',
+            color: '#ff9f43',
+            slots: [
+                { day: 0, startBlock: 3, span: 3 }, // Lun 10:00-12:15 (3 hrs)
+                { day: 2, startBlock: 1, span: 2 }  // Mié 8:30-10:00 (2 hrs)
+            ]
+        },
+        {
+            id: 'cultura',
+            name: 'CULTURA Y COMUNICACIÓN',
+            shortName: 'CCOM',
+            code: 'ACT-13010',
+            section: '08S-2623-D1',
+            room: 'YSSF-010',
+            teacher: 'Yokasta Castro Osal',
+            teacherCi: '13.519.138',
+            color: '#9b59b6',
+            slots: [{ day: 0, startBlock: 1, span: 2 }] // Lun 8:30-10:00 (2 hrs)
+        }
     ];
 
     const DEFAULT_SETTINGS = {
-        carrera:  'INGENIERÍA DE SISTEMAS',
+        carrera:  'INGENIERIA DE SISTEMAS',
         semestre: 'VIII',
         seccion:  '08S-2623-D1',
         periodo:  '2026-I (Diurno)'
@@ -657,7 +673,7 @@ const DB = (() => {
         const defaultSections = [
             {
                 id: '08S-2623-D1',
-                career: 'INGENIERÍA DE SISTEMAS',
+                career: 'INGENIERIA DE SISTEMAS',
                 semester: 'VIII',
                 section_code: '08S-2623-D1',
                 period: '2026-I (Diurno)'
